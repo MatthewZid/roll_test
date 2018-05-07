@@ -1,5 +1,8 @@
 #include <roll_test/stop_display.h>
 
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(roll_test::StopSignDisplay,rviz::Display)
+
 namespace roll_test
 {
 
@@ -94,6 +97,3 @@ void StopSignDisplay::processMessage( const roll_test::Pos::ConstPtr& msg )
 }
 
 }//end namespace
-
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(roll_test::StopSignDisplay,rviz::Display)

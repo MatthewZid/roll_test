@@ -14,7 +14,7 @@
 #include <rviz/properties/int_property.h>
 #include <rviz/frame_manager.h>
 
-#include "stop_visual.h"
+#include <roll_test/stop_visual.h>
 #include <rviz/message_filter_display.h>
 #include "roll_test/Pos.h"
 #endif

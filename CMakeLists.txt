@@ -58,8 +58,8 @@ add_definitions(-DQT_NO_KEYWORDS)
 ################################################
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES roll_test
+  #INCLUDE_DIRS include
+  #LIBRARIES roll_test
   CATKIN_DEPENDS roscpp message_runtime
  # DEPENDS system_lib
 )
@@ -82,18 +82,23 @@ set(SRC_FILES
   src/stop_display.cpp
   src/stop_visual.cpp
   src/stop_tool.cpp
-  #src/stop_cntrl.cpp
+)
+
+set(HEADER_FILES
+  include/${PROJECT_NAME}/stop_display.h
+  include/${PROJECT_NAME}/stop_visual.h
+  include/${PROJECT_NAME}/stop_tool.h
 )
 
 ## Declare a C++ library
 #
- add_library(${PROJECT_NAME} ${SRC_FILES})
+ add_library(${PROJECT_NAME} ${SRC_FILES} ${HEADER_FILES})
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES}  ${QT_LIBRARIES} ${OGRE_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} ${catkin_LIBRARIES})
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
@@ -117,15 +122,19 @@ target_link_libraries(gzbCntrl ${catkin_LIBRARIES}  ${QT_LIBRARIES} ${OGRE_LIBRA
 ## same as for the library above
  add_dependencies(gzbCntrl roll_test_generate_messages_cpp)
 
-install(FILES plugin_descriptiom.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
-install(DIRECTORY include/${PROJECT_NAME}/
-        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
-
 install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+install(FILES plugin_description.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY media/
+DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/media)
