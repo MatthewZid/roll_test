@@ -1,6 +1,13 @@
 #ifndef STOP_TOOL_H
 #define STOP_TOOL_H
 
+#define CHECK_DIST_X 1
+#define CHECK_DIST_NEG_X 1
+#define CHECK_DIST_Y 1
+#define CHECK_DIST_NEG_Y 1
+#define CHECK_DIST_Z 3
+#define CHECK_DIST_NEG_Z 1
+
 #include <rviz/tool.h>
 
 #include <OGRE/OgreSceneNode.h>
@@ -54,6 +61,8 @@ public:
 
 private:
   void makeFlag( const Ogre::Vector3& position );
+
+  bool compareRectangleXYZ(const Ogre::Vector3& position, const Ogre::Vector3& intersection);
 
   std::vector<Ogre::SceneNode*> flag_nodes_;
   Ogre::SceneNode* moving_flag_node_;

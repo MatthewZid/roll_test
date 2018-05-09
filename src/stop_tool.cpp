@@ -127,7 +127,12 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
     return Render;
   }
   Ogre::Vector3 intersection;
+  Ogre::Vector3 intersection_height_x;
+  Ogre::Vector3 intersection_height_y;
   Ogre::Plane ground_plane( Ogre::Vector3::UNIT_Z, 0.0f );
+  Ogre::Plane height_x_plane( Ogre::Vector3::UNIT_Y, 0.0f );
+  Ogre::Plane height_y_plane( Ogre::Vector3::UNIT_X, 0.0f );
+
   if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
                                          ground_plane,
                                          event.x, event.y, intersection ))
@@ -147,6 +152,37 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
   {
     moving_flag_node_->setVisible( false ); // If the mouse is not pointing at the ground plane, don't show the flag.
   }
+
+  //find existing flag nodes
+  if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
+                                         height_x_plane,
+                                         event.x, event.y, intersection_height_x ) and
+      rviz::getPointOnPlaneFromWindowXY( event.viewport,
+                                         ground_plane,
+                                         event.x, event.y, intersection ) and
+      rviz::getPointOnPlaneFromWindowXY( event.viewport,
+                                         height_y_plane,
+                                         event.x, event.y, intersection_height_y ))
+  {
+    Ogre::Vector3 cursor_pos;
+
+    cursor_pos.x=intersection.x;
+    cursor_pos.y=intersection.y;
+    cursor_pos.z=intersection_height_x.z;
+
+    ROS_INFO("Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
+
+    for(int i=0; i<flag_nodes_.size(); i++){
+      const Ogre::Vector3& flag_pos=flag_nodes_[i]->getPosition();
+
+      if(compareRectangleXYZ(flag_pos, cursor_pos))
+      {
+        //ROS_INFO("Found! Flag position: %f, %f, %f\n", flag_pos.x,flag_pos.y,flag_pos.z);
+        //ROS_INFO("Found! Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
+      }
+    }
+  }
+
   return Render;
 }
 
@@ -159,6 +195,23 @@ void StopTool::makeFlag( const Ogre::Vector3& position )
   node->setVisible( true );
   node->setPosition( position );
   flag_nodes_.push_back( node );
+
+  ROS_INFO("Flag at: %f, %f, %f\n", position.x,position.y,position.z);
+}
+
+bool StopTool::compareRectangleXYZ(const Ogre::Vector3& position, const Ogre::Vector3& intersection)
+{
+  if( ((intersection.x<=position.x+CHECK_DIST_X and intersection.x>=position.x) or
+     (intersection.x>=position.x-CHECK_DIST_NEG_X and intersection.x<=position.x)) and
+     ((intersection.y<=position.y+CHECK_DIST_Y and intersection.y>=position.y) or
+     (intersection.y>=position.y-CHECK_DIST_NEG_Y and intersection.y<=position.y)) and
+     ((intersection.z<=position.z+CHECK_DIST_Z and intersection.z>=position.z) or
+     (intersection.z>=position.z-CHECK_DIST_NEG_Z and intersection.z<=position.z)) )
+  {
+    return true;
+  }
+  else
+    return false;
 }
 
 // Loading and saving the flags

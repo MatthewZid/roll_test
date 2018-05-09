@@ -58,8 +58,8 @@ add_definitions(-DQT_NO_KEYWORDS)
 ################################################
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  #INCLUDE_DIRS include
-  #LIBRARIES roll_test
+  INCLUDE_DIRS include
+  LIBRARIES roll_test
   CATKIN_DEPENDS roscpp message_runtime
  # DEPENDS system_lib
 )
