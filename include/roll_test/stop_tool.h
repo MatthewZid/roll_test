@@ -1,10 +1,10 @@
 #ifndef STOP_TOOL_H
 #define STOP_TOOL_H
 
-#define CHECK_DIST_X 1
-#define CHECK_DIST_NEG_X 1
-#define CHECK_DIST_Y 1
-#define CHECK_DIST_NEG_Y 1
+#define CHECK_DIST_X 0.2
+#define CHECK_DIST_NEG_X 0.2
+#define CHECK_DIST_Y 0.2
+#define CHECK_DIST_NEG_Y 0.2
 #define CHECK_DIST_Z 3
 #define CHECK_DIST_NEG_Z 1
 
@@ -13,6 +13,8 @@
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreSceneManager.h>
 #include <OGRE/OgreEntity.h>
+#include <OGRE/OgreManualObject.h>
+#include <OGRE/OgreRenderOperation.h>
 
 #include <ros/console.h>
 
@@ -68,6 +70,9 @@ private:
   Ogre::SceneNode* moving_flag_node_;
   std::string flag_resource_;
   rviz::VectorProperty* current_flag_property_;
+
+  std::vector<Ogre::SceneNode*> point_nodes_;
+  std::vector<Ogre::ManualObject*> manual_objects_;
 };
 // END_TUTORIAL
 

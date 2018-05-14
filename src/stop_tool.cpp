@@ -29,6 +29,11 @@ StopTool::~StopTool()
   {
     scene_manager_->destroySceneNode( flag_nodes_[ i ]);
   }
+
+  for( unsigned i = 0; i < point_nodes_.size(); i++ )
+  {
+    scene_manager_->destroySceneNode( point_nodes_[ i ]);
+  }
 }
 
 // onInitialize() is called by the superclass after scene_manager_ and
@@ -56,6 +61,32 @@ void StopTool::onInitialize()
   Ogre::Entity* entity = scene_manager_->createEntity( flag_resource_ );
   moving_flag_node_->attachObject( entity );
   moving_flag_node_->setVisible( false );
+
+  Ogre::Vector3 point_pos[2];
+  point_pos[0].x=-1.0f;
+  point_pos[0].y=0.0f;
+  point_pos[0].z=0.5f;
+
+  point_pos[1].x=1.0f;
+  point_pos[1].y=0.0f;
+  point_pos[1].z=0.5f;
+
+  for(int i=0; i<2; i++){
+  	Ogre::ManualObject* manual = scene_manager_->createManualObject("manual"+i);
+	manual->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
+ 
+	manual->position(0.0, 0.0, 0.0);
+ 
+	manual->end();
+	Ogre::SceneNode* node = scene_manager_->getRootSceneNode()->createChildSceneNode();
+
+	node->attachObject(manual);
+	node->setVisible(true);
+	node->setPosition(point_pos[i]);
+
+	point_nodes_.push_back(node);
+	manual_objects_.push_back(manual);
+  }
 }
 
 // Activation and deactivation
@@ -79,7 +110,7 @@ void StopTool::activate()
 {
   if( moving_flag_node_ )
   {
-    moving_flag_node_->setVisible( true );
+    //moving_flag_node_->setVisible( true );
 
     current_flag_property_ = new rviz::VectorProperty( "Flag " + QString::number( flag_nodes_.size() ));
     current_flag_property_->setReadOnly( true );
@@ -133,7 +164,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
   Ogre::Plane height_x_plane( Ogre::Vector3::UNIT_Y, 0.0f );
   Ogre::Plane height_y_plane( Ogre::Vector3::UNIT_X, 0.0f );
 
-  if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
+  /*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
                                          ground_plane,
                                          event.x, event.y, intersection ))
   {
@@ -151,34 +182,45 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
   else
   {
     moving_flag_node_->setVisible( false ); // If the mouse is not pointing at the ground plane, don't show the flag.
-  }
+  }*/
 
   //find existing flag nodes
   if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
-                                         height_x_plane,
-                                         event.x, event.y, intersection_height_x ) and
-      rviz::getPointOnPlaneFromWindowXY( event.viewport,
                                          ground_plane,
-                                         event.x, event.y, intersection ) and
-      rviz::getPointOnPlaneFromWindowXY( event.viewport,
-                                         height_y_plane,
-                                         event.x, event.y, intersection_height_y ))
+                                         event.x, event.y, intersection ))
   {
     Ogre::Vector3 cursor_pos;
 
     cursor_pos.x=intersection.x;
     cursor_pos.y=intersection.y;
-    cursor_pos.z=intersection_height_x.z;
+    cursor_pos.z=0.0f;
 
-    ROS_INFO("Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
+    //ROS_INFO("Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
 
-    for(int i=0; i<flag_nodes_.size(); i++){
-      const Ogre::Vector3& flag_pos=flag_nodes_[i]->getPosition();
+    for(int i=0; i<point_nodes_.size(); i++){
+      const Ogre::Vector3& point_pos=point_nodes_[i]->getPosition();
+      //ROS_INFO("Point pos: %f,%f, %f\n", point_pos.x,point_pos.y,point_pos.z);
 
-      if(compareRectangleXYZ(flag_pos, cursor_pos))
+      if(compareRectangleXYZ(point_pos, cursor_pos))
       {
-        //ROS_INFO("Found! Flag position: %f, %f, %f\n", flag_pos.x,flag_pos.y,flag_pos.z);
-        //ROS_INFO("Found! Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
+      	Ogre::Vector3 point_pos[2];
+  		point_pos[0].x=-1.0f;
+  		point_pos[0].y=0.0f;
+  		point_pos[0].z=0.5f;
+
+  		point_pos[1].x=1.0f;
+  		point_pos[1].y=0.0f;
+  		point_pos[1].z=0.5f;
+
+      	for(int j=0; j < manual_objects_.size(); j++){
+      		manual_objects_[j]->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
+      		manual_objects_[j]->position(0.0,0.0,0.0);
+			manual_objects_[j]->colour(1.0,0.0,0.0,1.0);
+			manual_objects_[j]->end();
+			manual_objects_[j]->getParentNode()->setPosition(point_pos[j]);
+			manual_objects_[j]->getParentNode()->_update(true,true);
+      	}
+      	break;
       }
     }
   }
@@ -199,14 +241,14 @@ void StopTool::makeFlag( const Ogre::Vector3& position )
   ROS_INFO("Flag at: %f, %f, %f\n", position.x,position.y,position.z);
 }
 
-bool StopTool::compareRectangleXYZ(const Ogre::Vector3& position, const Ogre::Vector3& intersection)
+bool StopTool::compareRectangleXYZ(const Ogre::Vector3& point_pos, const Ogre::Vector3& cursor_pos)
 {
-  if( ((intersection.x<=position.x+CHECK_DIST_X and intersection.x>=position.x) or
-     (intersection.x>=position.x-CHECK_DIST_NEG_X and intersection.x<=position.x)) and
-     ((intersection.y<=position.y+CHECK_DIST_Y and intersection.y>=position.y) or
-     (intersection.y>=position.y-CHECK_DIST_NEG_Y and intersection.y<=position.y)) and
-     ((intersection.z<=position.z+CHECK_DIST_Z and intersection.z>=position.z) or
-     (intersection.z>=position.z-CHECK_DIST_NEG_Z and intersection.z<=position.z)) )
+  if( ((cursor_pos.x<=point_pos.x+CHECK_DIST_X and cursor_pos.x>=point_pos.x) or
+     (cursor_pos.x>=point_pos.x-CHECK_DIST_NEG_X and cursor_pos.x<=point_pos.x)) and
+     ((cursor_pos.y<=point_pos.y+CHECK_DIST_Y and cursor_pos.y>=point_pos.y) or
+     (cursor_pos.y>=point_pos.y-CHECK_DIST_NEG_Y and cursor_pos.y<=point_pos.y))/* and
+     ((cursor_pos.z<=point_pos.z+CHECK_DIST_Z and cursor_pos.z>=point_pos.z) or
+     (cursor_pos.z>=point_pos.z-CHECK_DIST_NEG_Z and cursor_pos.z<=point_pos.z))*/ )
   {
     return true;
   }
