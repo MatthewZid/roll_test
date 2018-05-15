@@ -184,8 +184,20 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
     moving_flag_node_->setVisible( false ); // If the mouse is not pointing at the ground plane, don't show the flag.
   }*/
 
+  //check if mouse moved
+  if(event.x==event.last_x and event.y==event.last_y)
+  	return Render;
+
+  Ogre::Vector3 point_pos;
+  bool point_found = context_->getSelectionManager()->get3DPoint(event.viewport, event.x, event.y, point_pos);
+
+  //point found
+  if(point_found){
+  	ROS_INFO("Found!\n");
+  }
+
   //find existing flag nodes
-  if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
+  /*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
                                          ground_plane,
                                          event.x, event.y, intersection ))
   {
@@ -223,7 +235,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
       	break;
       }
     }
-  }
+  }*/
 
   return Render;
 }
