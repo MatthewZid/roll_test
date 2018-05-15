@@ -20,6 +20,7 @@
 
 #include <rviz/viewport_mouse_event.h>
 #include <rviz/visualization_manager.h>
+#include <rviz/selection/selection_manager.h>
 #include <rviz/mesh_loader.h>
 #include <rviz/geometry.h>
 #include <rviz/properties/vector_property.h>
