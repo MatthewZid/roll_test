@@ -1,4 +1,5 @@
 #include <roll_test/stop_tool.h>
+#include <cstdlib>
 
 namespace roll_test
 {
@@ -15,6 +16,9 @@ namespace roll_test
 StopTool::StopTool()
   : moving_flag_node_( NULL )
   , current_flag_property_( NULL )
+  , selecting_(false)
+  , sel_start_x_(0)
+  , sel_start_y_(0)
 {
   shortcut_key_ = 's';
 }
@@ -116,6 +120,9 @@ void StopTool::activate()
     current_flag_property_->setReadOnly( true );
     getPropertyContainer()->addChild( current_flag_property_ );
   }
+
+  //context_->getSelectionManager()->setTextureSize(512);
+  selecting_ = false;
 }
 
 // deactivate() is called when the tool is being turned off because
@@ -134,6 +141,8 @@ void StopTool::deactivate()
     delete current_flag_property_;
     current_flag_property_ = NULL;
   }
+
+  context_->getSelectionManager()->removeHighlight();
 }
 
 // Handling mouse events
@@ -153,91 +162,164 @@ void StopTool::deactivate()
 // be deleted, which is what we want.
 int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 {
-  if( !moving_flag_node_ )
-  {
-    return Render;
-  }
-  Ogre::Vector3 intersection;
-  Ogre::Vector3 intersection_height_x;
-  Ogre::Vector3 intersection_height_y;
-  Ogre::Plane ground_plane( Ogre::Vector3::UNIT_Z, 0.0f );
-  Ogre::Plane height_x_plane( Ogre::Vector3::UNIT_Y, 0.0f );
-  Ogre::Plane height_y_plane( Ogre::Vector3::UNIT_X, 0.0f );
+  	int flags = 0;
 
-  /*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
-                                         ground_plane,
-                                         event.x, event.y, intersection ))
-  {
-    moving_flag_node_->setVisible( true );
-    moving_flag_node_->setPosition( intersection );
-    current_flag_property_->setVector( intersection );
+	if( !moving_flag_node_ )
+	{
+	return flags;
+	}
 
-    if( event.leftDown() )
-    {
-      makeFlag( intersection );
-      current_flag_property_ = NULL; // Drop the reference so that deactivate() won't remove it.
-      return Render | Finished;
-    }
-  }
-  else
-  {
-    moving_flag_node_->setVisible( false ); // If the mouse is not pointing at the ground plane, don't show the flag.
-  }*/
+	Ogre::Vector3 intersection;
+	Ogre::Vector3 intersection_height_x;
+	Ogre::Vector3 intersection_height_y;
+	Ogre::Plane ground_plane( Ogre::Vector3::UNIT_Z, 0.0f );
+	Ogre::Plane height_x_plane( Ogre::Vector3::UNIT_Y, 0.0f );
+	Ogre::Plane height_y_plane( Ogre::Vector3::UNIT_X, 0.0f );
 
-  //check if mouse moved
-  if(event.x==event.last_x and event.y==event.last_y)
-  	return Render;
+	//plant flag
+	/*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
+	                                     ground_plane,
+	                                     event.x, event.y, intersection ))
+	{
+	moving_flag_node_->setVisible( true );
+	moving_flag_node_->setPosition( intersection );
+	current_flag_property_->setVector( intersection );
 
-  Ogre::Vector3 point_pos;
-  bool point_found = context_->getSelectionManager()->get3DPoint(event.viewport, event.x, event.y, point_pos);
+	if( event.leftDown() )
+	{
+	  makeFlag( intersection );
+	  current_flag_property_ = NULL; // Drop the reference so that deactivate() won't remove it.
+	  return Render | Finished;
+	}
+	}
+	else
+	{
+	moving_flag_node_->setVisible( false ); // If the mouse is not pointing at the ground plane, don't show the flag.
+	}*/
 
-  //point found
-  if(point_found){
-  	ROS_INFO("Found!\n");
-  }
+	//check if mouse moved
+	/*if(event.x==event.last_x and event.y==event.last_y)
+		return flags;*/
 
-  //find existing flag nodes
-  /*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
-                                         ground_plane,
-                                         event.x, event.y, intersection ))
-  {
-    Ogre::Vector3 cursor_pos;
+	//selection rectangle
+	rviz::SelectionManager* sel_manager = context_->getSelectionManager();
 
-    cursor_pos.x=intersection.x;
-    cursor_pos.y=intersection.y;
-    cursor_pos.z=0.0f;
+	if(event.rightDown()){
+		selecting_ = true;
 
-    //ROS_INFO("Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
+		sel_start_x_ = event.x;
+		sel_start_y_ = event.y;
+	}
 
-    for(int i=0; i<point_nodes_.size(); i++){
-      const Ogre::Vector3& point_pos=point_nodes_[i]->getPosition();
-      //ROS_INFO("Point pos: %f,%f, %f\n", point_pos.x,point_pos.y,point_pos.z);
+	if(selecting_){
+		sel_manager->highlight(event.viewport, sel_start_x_, sel_start_y_, event.x, event.y);
 
-      if(compareRectangleXYZ(point_pos, cursor_pos))
-      {
-      	Ogre::Vector3 point_pos[2];
-  		point_pos[0].x=-1.0f;
-  		point_pos[0].y=0.0f;
-  		point_pos[0].z=0.5f;
+		if(event.rightUp()){
+			//rviz::SelectionManager::SelectType type = rviz::SelectionManager::Replace;
+			//rviz::M_Picked selection;
 
-  		point_pos[1].x=1.0f;
-  		point_pos[1].y=0.0f;
-  		point_pos[1].z=0.5f;
+			//sel_manager->select(event.viewport, sel_start_x_, sel_start_y_, event.x, event.y, type);
 
-      	for(int j=0; j < manual_objects_.size(); j++){
-      		manual_objects_[j]->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
-      		manual_objects_[j]->position(0.0,0.0,0.0);
+			/*Ogre::Vector3 point_pos;
+			bool point_found = sel_manager->get3DPoint(event.viewport, event.x, event.y, point_pos);
+
+			//point found
+			if(point_found){
+				ROS_INFO("Found!\n");
+
+				ROS_INFO("Point pos: %f, %f, %f\n", point_pos.x, point_pos.y, point_pos.z);
+			}*/
+
+			std::vector<Ogre::Vector3> points_pos;
+			unsigned width = std::abs(sel_start_x_ - event.x);
+			unsigned height = std::abs(sel_start_y_ - event.y);
+
+			ROS_INFO("Width: %u\n", width);
+			ROS_INFO("Height: %u\n", height);
+
+			ROS_INFO("Start x: %u\n", sel_start_x_);
+			ROS_INFO("Start y: %u\n", sel_start_y_);
+
+			bool points_found = sel_manager->get3DPatch(event.viewport, sel_start_x_, sel_start_y_, width, height, true, points_pos);
+
+			if(points_found){
+				ROS_INFO("Found!\n");
+				Ogre::Vector3 min_vec(100.0, 100.0, 100.0);
+
+				for(int i=0; i < points_pos.size(); i++){
+					if(points_pos[i].x < min_vec.x)
+						min_vec.x=points_pos[i].x;
+					if(points_pos[i].y < min_vec.y)
+						min_vec.y=points_pos[i].y;
+					if(points_pos[i].z < min_vec.z)
+						min_vec.z=points_pos[i].z;
+				}
+
+				for(int i=0; i < point_nodes_.size(); i++){
+					Ogre::Vector3& curr_point_pos = point_nodes_[i]->getPosition();
+
+					if( std::abs(min_vec.x - curr_point_pos.x) <= CHECK_DIST_X and
+						std::abs(min_vec.y - curr_point_pos.y) <= CHECK_DIST_Y and
+						std::abs(min_vec.z - curr_point_pos.z) <= CHECK_DIST_Z )
+
+					/*if(it != points_pos.end()){
+						ROS_INFO("Yeah!\n");
+						ROS_INFO("Found pos: %f, %f, %f\n", it->x, it->y, it->z);
+						points_pos.erase(it);
+					}*/
+				}
+			}
+
+			selecting_ = false;
+		}
+
+		flags |= Render;
+	}
+	else
+		sel_manager->highlight(event.viewport, event.x, event.y, event.x, event.y);
+
+	//find existing flag nodes
+	/*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
+	                                     ground_plane,
+	                                     event.x, event.y, intersection ))
+	{
+	Ogre::Vector3 cursor_pos;
+
+	cursor_pos.x=intersection.x;
+	cursor_pos.y=intersection.y;
+	cursor_pos.z=0.0f;
+
+	//ROS_INFO("Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
+
+	for(int i=0; i<point_nodes_.size(); i++){
+	  const Ogre::Vector3& point_pos=point_nodes_[i]->getPosition();
+	  //ROS_INFO("Point pos: %f,%f, %f\n", point_pos.x,point_pos.y,point_pos.z);
+
+	  if(compareRectangleXYZ(point_pos, cursor_pos))
+	  {
+	  	Ogre::Vector3 point_pos[2];
+			point_pos[0].x=-1.0f;
+			point_pos[0].y=0.0f;
+			point_pos[0].z=0.5f;
+
+			point_pos[1].x=1.0f;
+			point_pos[1].y=0.0f;
+			point_pos[1].z=0.5f;
+
+	  	for(int j=0; j < manual_objects_.size(); j++){
+	  		manual_objects_[j]->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
+	  		manual_objects_[j]->position(0.0,0.0,0.0);
 			manual_objects_[j]->colour(1.0,0.0,0.0,1.0);
 			manual_objects_[j]->end();
 			manual_objects_[j]->getParentNode()->setPosition(point_pos[j]);
 			manual_objects_[j]->getParentNode()->_update(true,true);
-      	}
-      	break;
-      }
-    }
-  }*/
+	  	}
+	  	break;
+	  }
+	}
+	}*/
 
-  return Render;
+	return flags;
 }
 
 // This is a helper function to create a new flag in the Ogre scene and save its scene node in a list.

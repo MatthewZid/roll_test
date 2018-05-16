@@ -1,11 +1,11 @@
 #ifndef STOP_TOOL_H
 #define STOP_TOOL_H
 
-#define CHECK_DIST_X 0.2
+#define CHECK_DIST_X 0.1
 #define CHECK_DIST_NEG_X 0.2
-#define CHECK_DIST_Y 0.2
+#define CHECK_DIST_Y 0.1
 #define CHECK_DIST_NEG_Y 0.2
-#define CHECK_DIST_Z 3
+#define CHECK_DIST_Z 0.5
 #define CHECK_DIST_NEG_Z 1
 
 #include <rviz/tool.h>
@@ -36,6 +36,7 @@ namespace rviz
 class VectorProperty;
 class VisualizationManager;
 class ViewportMouseEvent;
+class SelectionManager;
 }
 
 namespace roll_test
@@ -74,6 +75,10 @@ private:
 
   std::vector<Ogre::SceneNode*> point_nodes_;
   std::vector<Ogre::ManualObject*> manual_objects_;
+
+  bool selecting_;
+  int sel_start_x_;
+  int sel_start_y_;
 };
 // END_TUTORIAL
 
