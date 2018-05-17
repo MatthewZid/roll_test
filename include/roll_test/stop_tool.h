@@ -23,7 +23,9 @@
 #include <rviz/selection/selection_manager.h>
 #include <rviz/mesh_loader.h>
 #include <rviz/geometry.h>
+#include <rviz/ogre_helpers/shape.h>
 #include <rviz/properties/vector_property.h>
+#include <rviz/properties/property_tree_model.h>
 
 namespace Ogre
 {
@@ -37,6 +39,8 @@ class VectorProperty;
 class VisualizationManager;
 class ViewportMouseEvent;
 class SelectionManager;
+class PropertyTreeModel;
+class Shape;
 }
 
 namespace roll_test
@@ -75,6 +79,7 @@ private:
 
   std::vector<Ogre::SceneNode*> point_nodes_;
   std::vector<Ogre::ManualObject*> manual_objects_;
+  std::vector<rviz::Shape*> shapes_;
 
   bool selecting_;
   int sel_start_x_;

@@ -38,6 +38,12 @@ StopTool::~StopTool()
   {
     scene_manager_->destroySceneNode( point_nodes_[ i ]);
   }
+
+  for( unsigned i = 0; i < shapes_.size(); i++ )
+  {
+    delete shapes_[i];
+    shapes_[i]=NULL;
+  }
 }
 
 // onInitialize() is called by the superclass after scene_manager_ and
@@ -75,7 +81,17 @@ void StopTool::onInitialize()
   point_pos[1].y=0.0f;
   point_pos[1].z=0.5f;
 
-  for(int i=0; i<2; i++){
+  //create rviz::Shape
+  rviz::Shape* sphere = new rviz::Shape(rviz::Shape::Sphere, scene_manager_);
+  Ogre::Vector3 pos(0.0, 0.0, 0.0);
+  Ogre::Vector3 scale(0.001, 0.001, 0.001);
+  sphere->setColor(1.0, 0.0, 0.0, 1.0);
+  sphere->setPosition(pos);
+  sphere->setScale(scale);
+  shapes_.push_back(sphere);
+
+  //create manual object
+  /*for(int i=0; i<2; i++){
   	Ogre::ManualObject* manual = scene_manager_->createManualObject("manual"+i);
 	manual->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
  
@@ -90,7 +106,7 @@ void StopTool::onInitialize()
 
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
-  }
+  }*/
 }
 
 // Activation and deactivation
@@ -121,7 +137,7 @@ void StopTool::activate()
     getPropertyContainer()->addChild( current_flag_property_ );
   }
 
-  //context_->getSelectionManager()->setTextureSize(512);
+  context_->getSelectionManager()->setTextureSize(512);
   selecting_ = false;
 }
 
@@ -215,22 +231,16 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 		sel_manager->highlight(event.viewport, sel_start_x_, sel_start_y_, event.x, event.y);
 
 		if(event.rightUp()){
-			//rviz::SelectionManager::SelectType type = rviz::SelectionManager::Replace;
-			//rviz::M_Picked selection;
+			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
-			//sel_manager->select(event.viewport, sel_start_x_, sel_start_y_, event.x, event.y, type);
+    		/*rviz::CollObjectHandle object_handle = sel_manager->createHandle();
+    		rviz::SelectionHandler* sel_handler = sel_manager->getHandler(object_handle);
+    		sel_handler->
+    		sel_manager->addObject(object_handle, sel_handler);*/
 
-			/*Ogre::Vector3 point_pos;
-			bool point_found = sel_manager->get3DPoint(event.viewport, event.x, event.y, point_pos);
+			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
-			//point found
-			if(point_found){
-				ROS_INFO("Found!\n");
-
-				ROS_INFO("Point pos: %f, %f, %f\n", point_pos.x, point_pos.y, point_pos.z);
-			}*/
-
-			std::vector<Ogre::Vector3> points_pos;
+			/*std::vector<Ogre::Vector3> points_pos;
 			unsigned width = std::abs(sel_start_x_ - event.x);
 			unsigned height = std::abs(sel_start_y_ - event.y);
 
@@ -240,11 +250,15 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			ROS_INFO("Start x: %u\n", sel_start_x_);
 			ROS_INFO("Start y: %u\n", sel_start_y_);
 
+			ROS_INFO("Cursort x: %u\n", event.x);
+			ROS_INFO("Cursor y: %u\n", event.y);
+
 			bool points_found = sel_manager->get3DPatch(event.viewport, sel_start_x_, sel_start_y_, width, height, true, points_pos);
 
 			if(points_found){
-				ROS_INFO("Found!\n");
+				//ROS_INFO("Found points in rectangle!\n");
 				Ogre::Vector3 min_vec(100.0, 100.0, 100.0);
+				Ogre::Vector3 max_vec(-100.0, -100.0, -100.0);
 
 				for(int i=0; i < points_pos.size(); i++){
 					if(points_pos[i].x < min_vec.x)
@@ -253,22 +267,51 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 						min_vec.y=points_pos[i].y;
 					if(points_pos[i].z < min_vec.z)
 						min_vec.z=points_pos[i].z;
+
+					if(points_pos[i].x > max_vec.x)
+						max_vec.x=points_pos[i].x;
+					if(points_pos[i].y > max_vec.y)
+						max_vec.y=points_pos[i].y;
+					if(points_pos[i].z > max_vec.z)
+						max_vec.z=points_pos[i].z;
 				}
+				//ROS_INFO("Min coords: %f, %f, %f\n", min_vec.x, min_vec.y, min_vec.z);
+				//ROS_INFO("Max coords: %f, %f, %f\n", max_vec.x, max_vec.y, max_vec.z);
 
 				for(int i=0; i < point_nodes_.size(); i++){
-					Ogre::Vector3& curr_point_pos = point_nodes_[i]->getPosition();
+					Ogre::Vector3 curr_point_pos = point_nodes_[i]->getPosition();
+					std::vector<Ogre::Vector3>::iterator it = points_pos.begin();
 
-					if( std::abs(min_vec.x - curr_point_pos.x) <= CHECK_DIST_X and
-						std::abs(min_vec.y - curr_point_pos.y) <= CHECK_DIST_Y and
-						std::abs(min_vec.z - curr_point_pos.z) <= CHECK_DIST_Z )
+					Ogre::Vector3 min_dist(100.0, 100.0, 100.0);
 
-					/*if(it != points_pos.end()){
-						ROS_INFO("Yeah!\n");
+					for(; it != points_pos.end(); it++){
+						if(std::abs(it->x - curr_point_pos.x) < min_dist.x)
+							min_dist = std::abs(it->x - curr_point_pos.x);
+						if(std::abs(it->y - curr_point_pos.y) < min_dist.y)
+							min_dist = std::abs(it->y - curr_point_pos.y);
+						if(std::abs(it->z - curr_point_pos.z) < min_dist.z)
+							min_dist = std::abs(it->z - curr_point_pos.z);
+
+						if( std::abs(it->x - curr_point_pos.x) <= CHECK_DIST_X and
+							std::abs(it->y - curr_point_pos.y) <= CHECK_DIST_Y and
+							std::abs(it->z - curr_point_pos.z) <= CHECK_DIST_Z )
+						{
+							ROS_INFO("Yeah! Found point!\n");
+							break;
+						}
+					}
+
+					ROS_INFO("Min distance of %d: %f, %f, %f\n", i, min_dist.x, min_dist.y, min_dist.z);
+
+					if(it != points_pos.end()){
+						//ROS_INFO("Iterator not on end!\n");
 						ROS_INFO("Found pos: %f, %f, %f\n", it->x, it->y, it->z);
 						points_pos.erase(it);
-					}*/
+					}
+					else
+						ROS_INFO("Oops! Iterator on end...\n");
 				}
-			}
+			}*/
 
 			selecting_ = false;
 		}
@@ -278,7 +321,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 	else
 		sel_manager->highlight(event.viewport, event.x, event.y, event.x, event.y);
 
-	//find existing flag nodes
+	//find existing points and color them
 	/*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
 	                                     ground_plane,
 	                                     event.x, event.y, intersection ))
