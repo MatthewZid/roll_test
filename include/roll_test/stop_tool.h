@@ -23,9 +23,7 @@
 #include <rviz/selection/selection_manager.h>
 #include <rviz/mesh_loader.h>
 #include <rviz/geometry.h>
-#include <rviz/ogre_helpers/shape.h>
 #include <rviz/properties/vector_property.h>
-#include <rviz/properties/property_tree_model.h>
 
 namespace Ogre
 {
@@ -39,8 +37,6 @@ class VectorProperty;
 class VisualizationManager;
 class ViewportMouseEvent;
 class SelectionManager;
-class PropertyTreeModel;
-class Shape;
 }
 
 namespace roll_test
@@ -64,22 +60,19 @@ public:
 
   virtual int processMouseEvent( rviz::ViewportMouseEvent& event );
 
-  virtual void load( const rviz::Config& config );
-  virtual void save( rviz::Config config ) const;
+  //virtual void load( const rviz::Config& config );
+  //virtual void save( rviz::Config config ) const;
 
 private:
-  void makeFlag( const Ogre::Vector3& position );
+  //void makeFlag( const Ogre::Vector3& position );
 
-  bool compareRectangleXYZ(const Ogre::Vector3& position, const Ogre::Vector3& intersection);
-
-  std::vector<Ogre::SceneNode*> flag_nodes_;
-  Ogre::SceneNode* moving_flag_node_;
-  std::string flag_resource_;
-  rviz::VectorProperty* current_flag_property_;
+  //std::vector<Ogre::SceneNode*> flag_nodes_;
+  //Ogre::SceneNode* moving_flag_node_;
+  //std::string flag_resource_;
+  //rviz::VectorProperty* current_flag_property_;
 
   std::vector<Ogre::SceneNode*> point_nodes_;
   std::vector<Ogre::ManualObject*> manual_objects_;
-  std::vector<rviz::Shape*> shapes_;
 
   bool selecting_;
   int sel_start_x_;

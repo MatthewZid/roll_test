@@ -14,9 +14,9 @@ namespace roll_test
 // Here we set the "shortcut_key_" member variable defined in the
 // superclass to declare which key will activate the tool.
 StopTool::StopTool()
-  : moving_flag_node_( NULL )
+  : /*moving_flag_node_( NULL )
   , current_flag_property_( NULL )
-  , selecting_(false)
+  ,*/ selecting_(false)
   , sel_start_x_(0)
   , sel_start_y_(0)
 {
@@ -29,20 +29,14 @@ StopTool::StopTool()
 // button.
 StopTool::~StopTool()
 {
-  for( unsigned i = 0; i < flag_nodes_.size(); i++ )
+  /*for( unsigned i = 0; i < flag_nodes_.size(); i++ )
   {
     scene_manager_->destroySceneNode( flag_nodes_[ i ]);
-  }
+  }*/
 
   for( unsigned i = 0; i < point_nodes_.size(); i++ )
   {
     scene_manager_->destroySceneNode( point_nodes_[ i ]);
-  }
-
-  for( unsigned i = 0; i < shapes_.size(); i++ )
-  {
-    delete shapes_[i];
-    shapes_[i]=NULL;
   }
 }
 
@@ -59,7 +53,7 @@ StopTool::~StopTool()
 // set it invisible.
 void StopTool::onInitialize()
 {
-  flag_resource_ = "package://roll_test/media/flag.dae";
+  /*flag_resource_ = "package://roll_test/media/flag.dae";
 
   if( rviz::loadMeshFromResource( flag_resource_ ).isNull() )
   {
@@ -70,7 +64,7 @@ void StopTool::onInitialize()
   moving_flag_node_ = scene_manager_->getRootSceneNode()->createChildSceneNode();
   Ogre::Entity* entity = scene_manager_->createEntity( flag_resource_ );
   moving_flag_node_->attachObject( entity );
-  moving_flag_node_->setVisible( false );
+  moving_flag_node_->setVisible( false );*/
 
   Ogre::Vector3 point_pos[2];
   point_pos[0].x=-1.0f;
@@ -81,17 +75,8 @@ void StopTool::onInitialize()
   point_pos[1].y=0.0f;
   point_pos[1].z=0.5f;
 
-  //create rviz::Shape
-  rviz::Shape* sphere = new rviz::Shape(rviz::Shape::Sphere, scene_manager_);
-  Ogre::Vector3 pos(0.0, 0.0, 0.0);
-  Ogre::Vector3 scale(0.001, 0.001, 0.001);
-  sphere->setColor(1.0, 0.0, 0.0, 1.0);
-  sphere->setPosition(pos);
-  sphere->setScale(scale);
-  shapes_.push_back(sphere);
-
   //create manual object
-  /*for(int i=0; i<2; i++){
+  for(int i=0; i<2; i++){
   	Ogre::ManualObject* manual = scene_manager_->createManualObject("manual"+i);
 	manual->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
  
@@ -106,7 +91,7 @@ void StopTool::onInitialize()
 
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
-  }*/
+  }
 }
 
 // Activation and deactivation
@@ -128,14 +113,14 @@ void StopTool::onInitialize()
 // is left as an exercise for the reader.
 void StopTool::activate()
 {
-  if( moving_flag_node_ )
+  /*if( moving_flag_node_ )
   {
-    //moving_flag_node_->setVisible( true );
+    moving_flag_node_->setVisible( true );
 
     current_flag_property_ = new rviz::VectorProperty( "Flag " + QString::number( flag_nodes_.size() ));
     current_flag_property_->setReadOnly( true );
     getPropertyContainer()->addChild( current_flag_property_ );
-  }
+  }*/
 
   context_->getSelectionManager()->setTextureSize(512);
   selecting_ = false;
@@ -151,12 +136,12 @@ void StopTool::activate()
 // we switch to another tool.
 void StopTool::deactivate()
 {
-  if( moving_flag_node_ )
+  /*if( moving_flag_node_ )
   {
     moving_flag_node_->setVisible( false );
     delete current_flag_property_;
     current_flag_property_ = NULL;
-  }
+  }*/
 
   context_->getSelectionManager()->removeHighlight();
 }
@@ -180,17 +165,13 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 {
   	int flags = 0;
 
-	if( !moving_flag_node_ )
+	/*if( !moving_flag_node_ )
 	{
-	return flags;
-	}
+	return Render;
+	}*/
 
-	Ogre::Vector3 intersection;
-	Ogre::Vector3 intersection_height_x;
-	Ogre::Vector3 intersection_height_y;
-	Ogre::Plane ground_plane( Ogre::Vector3::UNIT_Z, 0.0f );
-	Ogre::Plane height_x_plane( Ogre::Vector3::UNIT_Y, 0.0f );
-	Ogre::Plane height_y_plane( Ogre::Vector3::UNIT_X, 0.0f );
+	//Ogre::Vector3 intersection;
+	//Ogre::Plane ground_plane( Ogre::Vector3::UNIT_Z, 0.0f );
 
 	//plant flag
 	/*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
@@ -233,85 +214,67 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 		if(event.rightUp()){
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
-    		/*rviz::CollObjectHandle object_handle = sel_manager->createHandle();
-    		rviz::SelectionHandler* sel_handler = sel_manager->getHandler(object_handle);
-    		sel_handler->
-    		sel_manager->addObject(object_handle, sel_handler);*/
+			/***************** Way No1 ******************
+			 *                                          *
+			 * Given the instances of the objects, find *
+			 * their 2D positions from their world 3D	*
+			 * positions.								*
+			 *											*
+			 ********************************************/
+
+			/*ROS_INFO("\nStart x,y: %d, %d\nEnd x,y: %d, %d\n-------------------------------------\n", sel_start_x_, sel_start_y_, event.x, event.y);
+
+			for(int i=0; i < manual_objects_.size(); i++){
+				Ogre::Vector3 point_pos = manual_objects_[i]->getParentNode()->getPosition();
+				Ogre::Vector2 point_coords = rviz::project3DPointToViewportXY(event.viewport, point_pos);
+
+				if( (point_coords.x <= sel_start_x_ or point_coords.x <= event.x) and
+					(point_coords.x >= sel_start_x_ or point_coords.x >= event.x) and
+					(point_coords.y <= sel_start_y_ or point_coords.y <= event.y) and
+					(point_coords.y >= sel_start_y_ or point_coords.y >= event.y) )
+				{
+					ROS_INFO("\nPoint %d in!!!\n", i);
+
+					//change color of every point in selection rectangle
+			  		manual_objects_[i]->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
+			  		manual_objects_[i]->position(0.0,0.0,0.0);
+					manual_objects_[i]->colour(1.0,0.0,0.0,1.0);
+					manual_objects_[i]->end();
+					manual_objects_[i]->getParentNode()->setPosition(point_pos);
+					manual_objects_[i]->getParentNode()->_update(true,true);
+				}
+			}
+			ROS_INFO("\n--------------------------------------\n");*/
+
+			/******************* Way No2 ********************
+			 *                                              *
+			 * Given the derived 2D positions of selection, *
+			 * find approximation of world 3D positions and *
+			 * their relative object instances.             *
+			 *											    *
+			 ************************************************/
+
+			rviz::SelectionManager::SelectType type = rviz::SelectionManager::Replace;
+			std::vector<Ogre::Vector3> points_pos;
+			Ogre::Vector3 single_point_selection_pos;
+			int width = std::abs(sel_start_x_ - event.x);
+			int height = std::abs(sel_start_y_ - event.y);
+
+			sel_manager->select(event.viewport, sel_start_x_, sel_start_y_, event.x, event.y, type);
+
+			if(sel_start_x_ < event.x and sel_start_y_ < event.y)
+				sel_manager->get3DPatch(event.viewport, sel_start_x_, sel_start_y_, width, height, true, points_pos);
+			else if(sel_start_x_ > event.x and sel_start_y_ < event.y)
+				sel_manager->get3DPatch(event.viewport, event.x, sel_start_y_, width, height, true, points_pos);
+			else if(sel_start_x_ < event.x and sel_start_y_ > event.y)
+				sel_manager->get3DPatch(event.viewport, sel_start_x_, event.y, width, height, true, points_pos);
+			else if(sel_start_x_ > event.x and sel_start_y_ > event.y)
+				sel_manager->get3DPatch(event.viewport, event.x, event.y, width, height, true, points_pos);
+
+			for(int i=0; i < points_pos.size(); i++)
+				ROS_INFO("Point x,y,z: %f, %f, %f\n", points_pos[i].x, points_pos[i].y, points_pos[i].z);
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
-
-			/*std::vector<Ogre::Vector3> points_pos;
-			unsigned width = std::abs(sel_start_x_ - event.x);
-			unsigned height = std::abs(sel_start_y_ - event.y);
-
-			ROS_INFO("Width: %u\n", width);
-			ROS_INFO("Height: %u\n", height);
-
-			ROS_INFO("Start x: %u\n", sel_start_x_);
-			ROS_INFO("Start y: %u\n", sel_start_y_);
-
-			ROS_INFO("Cursort x: %u\n", event.x);
-			ROS_INFO("Cursor y: %u\n", event.y);
-
-			bool points_found = sel_manager->get3DPatch(event.viewport, sel_start_x_, sel_start_y_, width, height, true, points_pos);
-
-			if(points_found){
-				//ROS_INFO("Found points in rectangle!\n");
-				Ogre::Vector3 min_vec(100.0, 100.0, 100.0);
-				Ogre::Vector3 max_vec(-100.0, -100.0, -100.0);
-
-				for(int i=0; i < points_pos.size(); i++){
-					if(points_pos[i].x < min_vec.x)
-						min_vec.x=points_pos[i].x;
-					if(points_pos[i].y < min_vec.y)
-						min_vec.y=points_pos[i].y;
-					if(points_pos[i].z < min_vec.z)
-						min_vec.z=points_pos[i].z;
-
-					if(points_pos[i].x > max_vec.x)
-						max_vec.x=points_pos[i].x;
-					if(points_pos[i].y > max_vec.y)
-						max_vec.y=points_pos[i].y;
-					if(points_pos[i].z > max_vec.z)
-						max_vec.z=points_pos[i].z;
-				}
-				//ROS_INFO("Min coords: %f, %f, %f\n", min_vec.x, min_vec.y, min_vec.z);
-				//ROS_INFO("Max coords: %f, %f, %f\n", max_vec.x, max_vec.y, max_vec.z);
-
-				for(int i=0; i < point_nodes_.size(); i++){
-					Ogre::Vector3 curr_point_pos = point_nodes_[i]->getPosition();
-					std::vector<Ogre::Vector3>::iterator it = points_pos.begin();
-
-					Ogre::Vector3 min_dist(100.0, 100.0, 100.0);
-
-					for(; it != points_pos.end(); it++){
-						if(std::abs(it->x - curr_point_pos.x) < min_dist.x)
-							min_dist = std::abs(it->x - curr_point_pos.x);
-						if(std::abs(it->y - curr_point_pos.y) < min_dist.y)
-							min_dist = std::abs(it->y - curr_point_pos.y);
-						if(std::abs(it->z - curr_point_pos.z) < min_dist.z)
-							min_dist = std::abs(it->z - curr_point_pos.z);
-
-						if( std::abs(it->x - curr_point_pos.x) <= CHECK_DIST_X and
-							std::abs(it->y - curr_point_pos.y) <= CHECK_DIST_Y and
-							std::abs(it->z - curr_point_pos.z) <= CHECK_DIST_Z )
-						{
-							ROS_INFO("Yeah! Found point!\n");
-							break;
-						}
-					}
-
-					ROS_INFO("Min distance of %d: %f, %f, %f\n", i, min_dist.x, min_dist.y, min_dist.z);
-
-					if(it != points_pos.end()){
-						//ROS_INFO("Iterator not on end!\n");
-						ROS_INFO("Found pos: %f, %f, %f\n", it->x, it->y, it->z);
-						points_pos.erase(it);
-					}
-					else
-						ROS_INFO("Oops! Iterator on end...\n");
-				}
-			}*/
 
 			selecting_ = false;
 		}
@@ -321,51 +284,10 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 	else
 		sel_manager->highlight(event.viewport, event.x, event.y, event.x, event.y);
 
-	//find existing points and color them
-	/*if( rviz::getPointOnPlaneFromWindowXY( event.viewport,
-	                                     ground_plane,
-	                                     event.x, event.y, intersection ))
-	{
-	Ogre::Vector3 cursor_pos;
-
-	cursor_pos.x=intersection.x;
-	cursor_pos.y=intersection.y;
-	cursor_pos.z=0.0f;
-
-	//ROS_INFO("Cursor position: %f, %f, %f\n", cursor_pos.x,cursor_pos.y,cursor_pos.z);
-
-	for(int i=0; i<point_nodes_.size(); i++){
-	  const Ogre::Vector3& point_pos=point_nodes_[i]->getPosition();
-	  //ROS_INFO("Point pos: %f,%f, %f\n", point_pos.x,point_pos.y,point_pos.z);
-
-	  if(compareRectangleXYZ(point_pos, cursor_pos))
-	  {
-	  	Ogre::Vector3 point_pos[2];
-			point_pos[0].x=-1.0f;
-			point_pos[0].y=0.0f;
-			point_pos[0].z=0.5f;
-
-			point_pos[1].x=1.0f;
-			point_pos[1].y=0.0f;
-			point_pos[1].z=0.5f;
-
-	  	for(int j=0; j < manual_objects_.size(); j++){
-	  		manual_objects_[j]->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
-	  		manual_objects_[j]->position(0.0,0.0,0.0);
-			manual_objects_[j]->colour(1.0,0.0,0.0,1.0);
-			manual_objects_[j]->end();
-			manual_objects_[j]->getParentNode()->setPosition(point_pos[j]);
-			manual_objects_[j]->getParentNode()->_update(true,true);
-	  	}
-	  	break;
-	  }
-	}
-	}*/
-
 	return flags;
 }
 
-// This is a helper function to create a new flag in the Ogre scene and save its scene node in a list.
+/*// This is a helper function to create a new flag in the Ogre scene and save its scene node in a list.
 void StopTool::makeFlag( const Ogre::Vector3& position )
 {
   Ogre::SceneNode* node = scene_manager_->getRootSceneNode()->createChildSceneNode();
@@ -376,24 +298,9 @@ void StopTool::makeFlag( const Ogre::Vector3& position )
   flag_nodes_.push_back( node );
 
   ROS_INFO("Flag at: %f, %f, %f\n", position.x,position.y,position.z);
-}
+}*/
 
-bool StopTool::compareRectangleXYZ(const Ogre::Vector3& point_pos, const Ogre::Vector3& cursor_pos)
-{
-  if( ((cursor_pos.x<=point_pos.x+CHECK_DIST_X and cursor_pos.x>=point_pos.x) or
-     (cursor_pos.x>=point_pos.x-CHECK_DIST_NEG_X and cursor_pos.x<=point_pos.x)) and
-     ((cursor_pos.y<=point_pos.y+CHECK_DIST_Y and cursor_pos.y>=point_pos.y) or
-     (cursor_pos.y>=point_pos.y-CHECK_DIST_NEG_Y and cursor_pos.y<=point_pos.y))/* and
-     ((cursor_pos.z<=point_pos.z+CHECK_DIST_Z and cursor_pos.z>=point_pos.z) or
-     (cursor_pos.z>=point_pos.z-CHECK_DIST_NEG_Z and cursor_pos.z<=point_pos.z))*/ )
-  {
-    return true;
-  }
-  else
-    return false;
-}
-
-// Loading and saving the flags
+/*// Loading and saving the flags
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //
 // Tools with a fixed set of Property objects representing adjustable
@@ -468,7 +375,7 @@ void StopTool::load( const rviz::Config& config )
     getPropertyContainer()->addChild( prop );
     makeFlag( prop->getVector() );
   }
-}
+}*/
 
 // End of .cpp file
 // ^^^^^^^^^^^^^^^^
