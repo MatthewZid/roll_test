@@ -34,10 +34,12 @@ StopTool::~StopTool()
     scene_manager_->destroySceneNode( flag_nodes_[ i ]);
   }*/
 
-  for( unsigned i = 0; i < point_nodes_.size(); i++ )
+  /*for( unsigned i = 0; i < point_nodes_.size(); i++ )
   {
     scene_manager_->destroySceneNode( point_nodes_[ i ]);
-  }
+  }*/
+
+  delete player;
 }
 
 // onInitialize() is called by the superclass after scene_manager_ and
@@ -66,7 +68,8 @@ void StopTool::onInitialize()
   moving_flag_node_->attachObject( entity );
   moving_flag_node_->setVisible( false );*/
 
-  Ogre::Vector3 point_pos[2];
+  //create manual object (NOT NEEDED, only for test purposes)
+  /*Ogre::Vector3 point_pos[2];
   point_pos[0].x=-1.0f;
   point_pos[0].y=0.0f;
   point_pos[0].z=0.5f;
@@ -75,15 +78,14 @@ void StopTool::onInitialize()
   point_pos[1].y=0.0f;
   point_pos[1].z=0.5f;
 
-  //create manual object
   for(int i=0; i<2; i++){
-  	Ogre::ManualObject* manual = scene_manager_->createManualObject("manual"+i);
+  	Ogre::ManualObject* manual = scene_manager_->createManualObject("manual_"+std::to_string(i));
 	manual->begin("BaseWhiteNoLighting", Ogre::RenderOperation::OT_POINT_LIST);
  
 	manual->position(0.0, 0.0, 0.0);
  
 	manual->end();
-	Ogre::SceneNode* node = scene_manager_->getRootSceneNode()->createChildSceneNode();
+	Ogre::SceneNode* node = scene_manager_->getRootSceneNode()->createChildSceneNode("manual"+std::to_string(i));
 
 	node->attachObject(manual);
 	node->setVisible(true);
@@ -91,7 +93,11 @@ void StopTool::onInitialize()
 
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
-  }
+  }*/
+
+  //initialize rosbag player
+  rosbag::PlayerOptions options;
+  player = new rosbag::Player(options);
 }
 
 // Activation and deactivation
@@ -124,6 +130,14 @@ void StopTool::activate()
 
   context_->getSelectionManager()->setTextureSize(512);
   selecting_ = false;
+
+  //start rosbag player
+  try{
+  	player->publish();
+  }
+  catch(std::runtime_error& e){
+  	ROS_FATAL("%s\n", e.what());
+  }
 }
 
 // deactivate() is called when the tool is being turned off because
@@ -201,7 +215,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 	//selection rectangle
 	rviz::SelectionManager* sel_manager = context_->getSelectionManager();
 
-	if(event.rightDown()){
+	if(event.leftDown()){
 		selecting_ = true;
 
 		sel_start_x_ = event.x;
@@ -211,14 +225,14 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 	if(selecting_){
 		sel_manager->highlight(event.viewport, sel_start_x_, sel_start_y_, event.x, event.y);
 
-		if(event.rightUp()){
+		if(event.leftUp()){
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
 			/***************** Way No1 ******************
 			 *                                          *
 			 * Given the instances of the objects, find *
 			 * their 2D positions from their world 3D	*
-			 * positions.								*
+			 * positions. (DEPRECATED)					*
 			 *											*
 			 ********************************************/
 
@@ -251,16 +265,24 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			 * Given the derived 2D positions of selection, *
 			 * find approximation of world 3D positions and *
 			 * their relative object instances.             *
+			 * (DEPRECATED)									*
 			 *											    *
 			 ************************************************/
 
+			//actual selection (defined by type)
 			rviz::SelectionManager::SelectType type = rviz::SelectionManager::Replace;
-			std::vector<Ogre::Vector3> points_pos;
-			Ogre::Vector3 single_point_selection_pos;
-			int width = std::abs(sel_start_x_ - event.x);
-			int height = std::abs(sel_start_y_ - event.y);
+
+			if(event.shift())
+				type = rviz::SelectionManager::Add;
+			else if(event.control())
+				type = rviz::SelectionManager::Remove;
 
 			sel_manager->select(event.viewport, sel_start_x_, sel_start_y_, event.x, event.y, type);
+
+			//get 3D coords from selection
+			/*std::vector<Ogre::Vector3> points_pos;
+			int width = std::abs(sel_start_x_ - event.x);
+			int height = std::abs(sel_start_y_ - event.y);
 
 			if(sel_start_x_ < event.x and sel_start_y_ < event.y)
 				sel_manager->get3DPatch(event.viewport, sel_start_x_, sel_start_y_, width, height, true, points_pos);
@@ -269,10 +291,19 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			else if(sel_start_x_ < event.x and sel_start_y_ > event.y)
 				sel_manager->get3DPatch(event.viewport, sel_start_x_, event.y, width, height, true, points_pos);
 			else if(sel_start_x_ > event.x and sel_start_y_ > event.y)
-				sel_manager->get3DPatch(event.viewport, event.x, event.y, width, height, true, points_pos);
+				sel_manager->get3DPatch(event.viewport, event.x, event.y, width, height, true, points_pos);*/
 
-			for(int i=0; i < points_pos.size(); i++)
-				ROS_INFO("Point x,y,z: %f, %f, %f\n", points_pos[i].x, points_pos[i].y, points_pos[i].z);
+			//handle selected point cloud properties
+			rviz::PropertyTreeModel *model = sel_manager->getPropertyModel();
+			int num_points = model->rowCount();
+
+			for(int i=0; i < num_points; i++)
+			{
+				QModelIndex child_index = model->index(i, 0);
+				rviz::Property *child = model->getProp(child_index);
+				ROS_INFO("Name %d: %s\n", i, (child->getNameStd()).c_str());
+				//rviz::VectorProperty *subchild = (rviz::VecorProperty*) child->childAt(0);
+			}
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 

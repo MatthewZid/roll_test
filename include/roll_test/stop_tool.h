@@ -23,7 +23,12 @@
 #include <rviz/selection/selection_manager.h>
 #include <rviz/mesh_loader.h>
 #include <rviz/geometry.h>
+
 #include <rviz/properties/vector_property.h>
+#include <rviz/properties/property.h>
+#include <rviz/properties/property_tree_model.h>
+
+#include <rosbag/player.h>
 
 namespace Ogre
 {
@@ -37,6 +42,14 @@ class VectorProperty;
 class VisualizationManager;
 class ViewportMouseEvent;
 class SelectionManager;
+class PropertyTreeModel;
+class Property;
+}
+
+namespace rosbag
+{
+class PlayerOptions;
+class Player;
 }
 
 namespace roll_test
@@ -71,8 +84,10 @@ private:
   //std::string flag_resource_;
   //rviz::VectorProperty* current_flag_property_;
 
-  std::vector<Ogre::SceneNode*> point_nodes_;
-  std::vector<Ogre::ManualObject*> manual_objects_;
+  //std::vector<Ogre::SceneNode*> point_nodes_;
+  //std::vector<Ogre::ManualObject*> manual_objects_;
+
+  rosbag::Player* player;
 
   bool selecting_;
   int sel_start_x_;
