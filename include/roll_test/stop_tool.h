@@ -1,12 +1,15 @@
 #ifndef STOP_TOOL_H
 #define STOP_TOOL_H
 
-#define CHECK_DIST_X 0.1
+//distance defines (DEPRECATED)
+/*#define CHECK_DIST_X 0.1
 #define CHECK_DIST_NEG_X 0.2
 #define CHECK_DIST_Y 0.1
 #define CHECK_DIST_NEG_Y 0.2
 #define CHECK_DIST_Z 0.5
-#define CHECK_DIST_NEG_Z 1
+#define CHECK_DIST_NEG_Z 1*/
+
+#define BAGPATH "/home/matthew/Ros_WS/bagfiles/"
 
 #include <rviz/tool.h>
 
@@ -29,6 +32,7 @@
 #include <rviz/properties/property_tree_model.h>
 
 #include <rosbag/player.h>
+#include <string>
 
 namespace Ogre
 {
@@ -88,6 +92,7 @@ private:
   //std::vector<Ogre::ManualObject*> manual_objects_;
 
   rosbag::Player* player;
+  std::vector<std::string> bagfiles;
 
   bool selecting_;
   int sel_start_x_;

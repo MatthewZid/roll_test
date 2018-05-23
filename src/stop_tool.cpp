@@ -95,8 +95,25 @@ void StopTool::onInitialize()
 	manual_objects_.push_back(manual);
   }*/
 
+  //insert .bag files
+  bagfiles.push_back("2018-02-14-14-01-08.bag");
+  bagfiles.push_back("2018-02-14-14-07-54.bag");
+
   //initialize rosbag player
   rosbag::PlayerOptions options;
+
+  options.loop = true;
+  options.keep_alive = true;
+
+  options.topics.push_back("/elevation_mapping/elevation_map");
+  options.topics.push_back("/joint_states");
+  options.topics.push_back("/tf");
+  options.topics.push_back("/tf_static");
+  options.topics.push_back("/traversability_estimation/traversability_map");
+  options.topics.push_back("/zed/point_cloud/cloud_registered");
+  options.topics.push_back("/zed/right/image_raw_color/compressed");
+
+  options.bags.push_back(BAGPATH+bagfiles[0]);
   player = new rosbag::Player(options);
 }
 
