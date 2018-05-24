@@ -39,7 +39,7 @@ StopTool::~StopTool()
     scene_manager_->destroySceneNode( point_nodes_[ i ]);
   }*/
 
-  delete player;
+	//delete rosbag_player_helper;
 }
 
 // onInitialize() is called by the superclass after scene_manager_ and
@@ -94,27 +94,7 @@ void StopTool::onInitialize()
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
   }*/
-
-  //insert .bag files
-  bagfiles.push_back("2018-02-14-14-01-08.bag");
-  bagfiles.push_back("2018-02-14-14-07-54.bag");
-
-  //initialize rosbag player
-  rosbag::PlayerOptions options;
-
-  options.loop = true;
-  options.keep_alive = true;
-
-  options.topics.push_back("/elevation_mapping/elevation_map");
-  options.topics.push_back("/joint_states");
-  options.topics.push_back("/tf");
-  options.topics.push_back("/tf_static");
-  options.topics.push_back("/traversability_estimation/traversability_map");
-  options.topics.push_back("/zed/point_cloud/cloud_registered");
-  options.topics.push_back("/zed/right/image_raw_color/compressed");
-
-  options.bags.push_back(BAGPATH+bagfiles[0]);
-  player = new rosbag::Player(options);
+	//rosbag_player_helper = new helper::RosbagPlayerHelper();
 }
 
 // Activation and deactivation
@@ -148,13 +128,9 @@ void StopTool::activate()
   context_->getSelectionManager()->setTextureSize(512);
   selecting_ = false;
 
-  //start rosbag player
-  try{
-  	player->publish();
-  }
-  catch(std::runtime_error& e){
-  	ROS_FATAL("%s\n", e.what());
-  }
+  //start rosbag player in parallel
+  boost::thread player_thread(runPlayer);
+  //player_thread.join();
 }
 
 // deactivate() is called when the tool is being turned off because
@@ -333,6 +309,18 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 		sel_manager->highlight(event.viewport, event.x, event.y, event.x, event.y);
 
 	return flags;
+}
+
+void runPlayer()
+{
+	try{
+		helper::RosbagPlayerHelper rosbag_player_helper;
+		
+  		rosbag_player_helper.player->publish();
+  	}
+  	catch(std::runtime_error& e){
+  		ROS_FATAL("%s\n", e.what());
+  	}
 }
 
 /*// This is a helper function to create a new flag in the Ogre scene and save its scene node in a list.

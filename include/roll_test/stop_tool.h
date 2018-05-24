@@ -9,8 +9,6 @@
 #define CHECK_DIST_Z 0.5
 #define CHECK_DIST_NEG_Z 1*/
 
-#define BAGPATH "/home/matthew/Ros_WS/bagfiles/"
-
 #include <rviz/tool.h>
 
 #include <OGRE/OgreSceneNode.h>
@@ -19,7 +17,7 @@
 #include <OGRE/OgreManualObject.h>
 #include <OGRE/OgreRenderOperation.h>
 
-#include <ros/console.h>
+//#include <ros/console.h>
 
 #include <rviz/viewport_mouse_event.h>
 #include <rviz/visualization_manager.h>
@@ -31,13 +29,17 @@
 #include <rviz/properties/property.h>
 #include <rviz/properties/property_tree_model.h>
 
-#include <rosbag/player.h>
-#include <string>
+#include <roll_test/rosbag_player.h>
 
 namespace Ogre
 {
 class SceneNode;
 class Vector3;
+}
+
+namespace helper
+{
+class RosbagPlayerHelper;
 }
 
 namespace rviz
@@ -50,14 +52,9 @@ class PropertyTreeModel;
 class Property;
 }
 
-namespace rosbag
-{
-class PlayerOptions;
-class Player;
-}
-
 namespace roll_test
 {
+  void runPlayer();
 
 // BEGIN_TUTORIAL
 // Here we declare our new subclass of rviz::Tool.  Every tool
@@ -90,9 +87,6 @@ private:
 
   //std::vector<Ogre::SceneNode*> point_nodes_;
   //std::vector<Ogre::ManualObject*> manual_objects_;
-
-  rosbag::Player* player;
-  std::vector<std::string> bagfiles;
 
   bool selecting_;
   int sel_start_x_;
