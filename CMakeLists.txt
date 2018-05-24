@@ -82,12 +82,14 @@ set(SRC_FILES
   src/stop_display.cpp
   src/stop_visual.cpp
   src/stop_tool.cpp
+  src/rosbag_player.cpp
 )
 
 set(HEADER_FILES
   include/${PROJECT_NAME}/stop_display.h
   include/${PROJECT_NAME}/stop_visual.h
   include/${PROJECT_NAME}/stop_tool.h
+  include/${PROJECT_NAME}/rosbag_player.h
 )
 
 ## Declare a C++ library
