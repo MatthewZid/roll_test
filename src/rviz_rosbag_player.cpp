@@ -272,30 +272,323 @@ void Player::publish() {
 
 void Player::updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event)
 {
+    boost::shared_ptr<topic_tools::ShapeShifter const> const &ssmsg = msg_event.getConstMessage();
+    std::string def = ssmsg->getMessageDefinition();
+    size_t length = ros::serialization::serializationLength(*ssmsg);
+    
+    // Check the message definition.
+    std::istringstream f(def);
+    std::string s;
+    bool flag = false;
+    while(std::getline(f, s, '\n')) {
+        if (s.find("#") != 0) {
+            // Does not start with #, is not a comment.
+            if(s == "Header header") {
+                flag = true;
+            }
+        }
+    }
+    // If the header is not the first element in the message according to the definition, throw an error.
+    if (!flag) {
+        std::cout << std::endl << "WARNING: Rate control topic is bad, header is not first. MSG may be malformed." << std::endl;
+        return;
+    }
+
+    std::vector<uint8_t> buffer(length);
+    ros::serialization::OStream ostream(&buffer[0], length);
+    ros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, *ssmsg);
+
+    // Assuming that the header is the first several bytes of the message.
+    //uint32_t header_sequence_id   = buffer[0] | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2] << 16 | (uint32_t)buffer[3] << 24;
+    int32_t header_timestamp_sec  = buffer[4] | (uint32_t)buffer[5] << 8 | (uint32_t)buffer[6] << 16 | (uint32_t)buffer[7] << 24;
+    int32_t header_timestamp_nsec = buffer[8] | (uint32_t)buffer[9] << 8 | (uint32_t)buffer[10] << 16 | (uint32_t)buffer[11] << 24;
+
+    last_rate_control_ = ros::Time(header_timestamp_sec, header_timestamp_nsec);
 }
 
 void Player::printTime()
 {
+    if (!options_.quiet) {
+
+        ros::Time current_time = time_publisher_.getTime();
+        ros::Duration d = current_time - start_time_;
+
+
+        if (paused_)
+        {
+            printf("\r [PAUSED ]  Bag Time: %13.6f   Duration: %.6f / %.6f               \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec());
+        }
+        else if (delayed_)
+        {
+            ros::Duration time_since_rate = std::max(ros::Time::now() - last_rate_control_, ros::Duration(0));
+            printf("\r [DELAYED]  Bag Time: %13.6f   Duration: %.6f / %.6f   Delay: %.2f \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec(), time_since_rate.toSec());
+        }
+        else
+        {
+            printf("\r [RUNNING]  Bag Time: %13.6f   Duration: %.6f / %.6f               \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec());
+        }
+        fflush(stdout);
+    }
 }
 
 bool Player::pauseCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res)
 {
+    pause_change_requested_ = (req.data != paused_);
+  requested_pause_state_ = req.data;
+
+  res.success = pause_change_requested_;
+
+  if (res.success)
+  {
+    res.message = std::string("Playback is now ") + (requested_pause_state_ ? "paused" : "resumed");
+  }
+  else
+  {
+    res.message = std::string("Bag is already ") + (requested_pause_state_ ? "paused." : "running.");
+  }
+
+    return true;
 }
 
 void Player::processPause(const bool paused, ros::WallTime &horizon)
 {
+    paused_ = paused;
+
+  if (paused_)
+  {
+    paused_time_ = ros::WallTime::now();
+  }
+  else
+  {
+    // Make sure time doesn't shift after leaving pause.
+    ros::WallDuration shift = ros::WallTime::now() - paused_time_;
+    paused_time_ = ros::WallTime::now();
+
+    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+
+    horizon += shift;
+    time_publisher_.setWCHorizon(horizon);
+  }
 }
 
 void Player::waitForSubscribers() const
 {
+    bool all_topics_subscribed = false;
+    std::cout << "Waiting for subscribers." << std::endl;
+    while (!all_topics_subscribed) {
+        all_topics_subscribed = true;
+        for(const PublisherMap::value_type& pub : publishers_) {
+            all_topics_subscribed &= pub.second.getNumSubscribers() > 0;
+        }
+        ros::Duration(0.1).sleep();
+    }
+    std::cout << "Finished waiting for subscribers." << std::endl;
 }
 
 void Player::doPublish(rosbag::MessageInstance const& m)
 {
+    std::string const& topic   = m.getTopic();
+    ros::Time const& time = m.getTime();
+    std::string callerid       = m.getCallerId();
+    
+    ros::Time translated = time_translator_.translate(time);
+    ros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
+
+    time_publisher_.setHorizon(time);
+    time_publisher_.setWCHorizon(horizon);
+
+    std::string callerid_topic = callerid + topic;
+
+    std::map<std::string, ros::Publisher>::iterator pub_iter = publishers_.find(callerid_topic);
+    ROS_ASSERT(pub_iter != publishers_.end());
+
+    // Update subscribers.
+    ros::spinOnce();
+
+    // If immediate specified, play immediately
+    if (options_.at_once) {
+        time_publisher_.stepClock();
+        pub_iter->second.publish(m);
+        printTime();
+        return;
+    }
+
+    // If skip_empty is specified, skip this region and shift.
+    if (time - time_publisher_.getTime() > options_.skip_empty)
+    {
+      time_publisher_.stepClock();
+
+      ros::WallDuration shift = ros::WallTime::now() - horizon ;
+      time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+      horizon += shift;
+      time_publisher_.setWCHorizon(horizon);
+      (pub_iter->second).publish(m);
+      printTime();
+      return;
+    }
+
+    if (pause_for_topics_)
+    {
+        for (std::vector<std::string>::iterator i = options_.pause_topics.begin();
+             i != options_.pause_topics.end();
+             ++i)
+        {
+            if (topic == *i)
+            {
+                paused_ = true;
+                paused_time_ = ros::WallTime::now();
+            }
+        }
+    }
+
+    // Check if the rate control topic has posted recently enough to continue, or if a delay is needed.
+    // Delayed is separated from paused to allow more verbose printing.
+    if (rate_control_sub_ != NULL) {
+        if ((time_publisher_.getTime() - last_rate_control_).toSec() > options_.rate_control_max_delay) {
+            delayed_ = true;
+            paused_time_ = ros::WallTime::now();
+        }
+    }
+
+    while ((paused_ or delayed_ or !time_publisher_.horizonReached()) and node_handle_.ok())
+    {
+        bool charsleftorpaused = true;
+        while (charsleftorpaused and node_handle_.ok())
+        {
+            ros::spinOnce();
+
+            if (pause_change_requested_)
+            {
+              processPause(requested_pause_state_, horizon);
+              pause_change_requested_ = false;
+            }
+
+            //terminal input while player running
+            //replace this segment with rviz panel input
+            /*switch (readCharFromStdin()){
+            case ' ':
+                processPause(!paused_, horizon);
+                break;
+            case 's':
+                if (paused_) {
+                    time_publisher_.stepClock();
+
+                    ros::WallDuration shift = ros::WallTime::now() - horizon ;
+                    paused_time_ = ros::WallTime::now();
+
+                    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+
+                    horizon += shift;
+                    time_publisher_.setWCHorizon(horizon);
+            
+                    (pub_iter->second).publish(m);
+
+                    printTime();
+                    return;
+                }
+                break;
+            case 't':
+                pause_for_topics_ = !pause_for_topics_;
+                break;
+            case EOF:
+                if (paused_)
+                {
+                    printTime();
+                    time_publisher_.runStalledClock(ros::WallDuration(.1));
+                    ros::spinOnce();
+                }
+                else if (delayed_)
+                {
+                    printTime();
+                    time_publisher_.runStalledClock(ros::WallDuration(.1));
+                    ros::spinOnce();
+                    // You need to check the rate here too.
+                    if(rate_control_sub_ == NULL || (time_publisher_.getTime() - last_rate_control_).toSec() <= options_.rate_control_max_delay) {
+                        delayed_ = false;
+                        // Make sure time doesn't shift after leaving delay.
+                        ros::WallDuration shift = ros::WallTime::now() - paused_time_;
+                        paused_time_ = ros::WallTime::now();
+         
+                        time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+
+                        horizon += shift;
+                        time_publisher_.setWCHorizon(horizon);
+                    }
+                }
+                else
+                    charsleftorpaused = false;
+            }*/
+            charsleftorpaused = false;  //remove this line if above section is back
+        }
+
+        printTime();
+        time_publisher_.runClock(ros::WallDuration(.1));
+        ros::spinOnce();
+    }
+
+    pub_iter->second.publish(m);
 }
 
 void Player::doKeepAlive()
 {
+    //Keep pushing ourself out in 10-sec increments (avoids fancy math dealing with the end of time)
+    ros::Time const& time = time_publisher_.getTime() + ros::Duration(10.0);
+
+    ros::Time translated = time_translator_.translate(time);
+    ros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
+
+    time_publisher_.setHorizon(time);
+    time_publisher_.setWCHorizon(horizon);
+
+    if (options_.at_once) {
+        return;
+    }
+
+    // If we're done and just staying alive, don't watch the rate control topic. We aren't publishing anyway.
+    delayed_ = false;
+
+    while ((paused_ or !time_publisher_.horizonReached()) and node_handle_.ok())
+    {
+        bool charsleftorpaused = true;
+        while (charsleftorpaused and node_handle_.ok())
+        {
+            //terminal input while player running
+            //replace this segment with rviz panel input
+            /*switch (readCharFromStdin()){
+            case ' ':
+                paused_ = !paused_;
+                if (paused_) {
+                    paused_time_ = ros::WallTime::now();
+                }
+                else
+                {
+                    // Make sure time doesn't shift after leaving pause.
+                    ros::WallDuration shift = ros::WallTime::now() - paused_time_;
+                    paused_time_ = ros::WallTime::now();
+         
+                    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+
+                    horizon += shift;
+                    time_publisher_.setWCHorizon(horizon);
+                }
+                break;
+            case EOF:
+                if (paused_)
+                {
+                    printTime();
+                    time_publisher_.runStalledClock(ros::WallDuration(.1));
+                    ros::spinOnce();
+                }
+                else
+                    charsleftorpaused = false;
+            }*/
+            charsleftorpaused = false;  //remove this line if above section is back
+        }
+
+        printTime();
+        time_publisher_.runClock(ros::WallDuration(.1));
+        ros::spinOnce();
+    }
 }
 
 TimePublisher::TimePublisher() : time_scale_(1.0)
@@ -306,42 +599,155 @@ TimePublisher::TimePublisher() : time_scale_(1.0)
 
 void TimePublisher::setPublishFrequency(double publish_frequency)
 {
+    publish_frequency_ = publish_frequency;
+  
+  do_publish_ = (publish_frequency > 0.0);
+
+  wall_step_.fromSec(1.0 / publish_frequency);
 }
 
 void TimePublisher::setTimeScale(double time_scale)
 {
+    time_scale_ = time_scale;
 }
 
 void TimePublisher::setHorizon(const ros::Time& horizon)
 {
+    horizon_ = horizon;
 }
 
 void TimePublisher::setWCHorizon(const ros::WallTime& horizon)
 {
+    wc_horizon_ = horizon;
 }
 
 void TimePublisher::setTime(const ros::Time& time)
 {
+    current_ = time;
 }
 
 ros::Time const& TimePublisher::getTime() const
 {
+    return current_;
 }
 
 void TimePublisher::runClock(const ros::WallDuration& duration)
 {
+    if (do_publish_)
+    {
+        rosgraph_msgs::Clock pub_msg;
+
+        ros::WallTime t = ros::WallTime::now();
+        ros::WallTime done = t + duration;
+
+        while (t < done and t < wc_horizon_)
+        {
+            ros::WallDuration leftHorizonWC = wc_horizon_ - t;
+
+            ros::Duration d(leftHorizonWC.sec, leftHorizonWC.nsec);
+            d *= time_scale_;
+
+            current_ = horizon_ - d;
+
+            if (current_ >= horizon_)
+              current_ = horizon_;
+
+            if (t >= next_pub_)
+            {
+                pub_msg.clock = current_;
+                time_pub_.publish(pub_msg);
+                next_pub_ = t + wall_step_;
+            }
+
+            ros::WallTime target = done;
+            if (target > wc_horizon_)
+              target = wc_horizon_;
+            if (target > next_pub_)
+              target = next_pub_;
+
+            ros::WallTime::sleepUntil(target);
+
+            t = ros::WallTime::now();
+        }
+    }
+    else {
+
+        ros::WallTime t = ros::WallTime::now();
+
+        ros::WallDuration leftHorizonWC = wc_horizon_ - t;
+
+        ros::Duration d(leftHorizonWC.sec, leftHorizonWC.nsec);
+        d *= time_scale_;
+
+        current_ = horizon_ - d;
+        
+        if (current_ >= horizon_)
+            current_ = horizon_;
+
+        ros::WallTime target = ros::WallTime::now() + duration;
+
+        if (target > wc_horizon_)
+            target = wc_horizon_;
+
+        ros::WallTime::sleepUntil(target);
+    }
 }
 
 void TimePublisher::stepClock()
 {
+    if (do_publish_)
+    {
+        current_ = horizon_;
+
+        rosgraph_msgs::Clock pub_msg;
+
+        pub_msg.clock = current_;
+        time_pub_.publish(pub_msg);
+
+        ros::WallTime t = ros::WallTime::now();
+        next_pub_ = t + wall_step_;
+    }
+    else {
+        current_ = horizon_;
+    }
 }
 
 void TimePublisher::runStalledClock(const ros::WallDuration& duration)
 {
+    if (do_publish_)
+    {
+        rosgraph_msgs::Clock pub_msg;
+
+        ros::WallTime t = ros::WallTime::now();
+        ros::WallTime done = t + duration;
+
+        while ( t < done )
+        {
+            if (t > next_pub_)
+            {
+                pub_msg.clock = current_;
+                time_pub_.publish(pub_msg);
+                next_pub_ = t + wall_step_;
+            }
+
+            ros::WallTime target = done;
+
+            if (target > next_pub_)
+              target = next_pub_;
+
+            ros::WallTime::sleepUntil(target);
+
+            t = ros::WallTime::now();
+        }
+    }
+    else {
+        duration.sleep();
+    }
 }
 
 bool TimePublisher::horizonReached()
 {
+    return ros::WallTime::now() > wc_horizon_;
 }
 
 }
