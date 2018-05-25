@@ -8,7 +8,7 @@
 #define CHECK_DIST_NEG_Y 0.2
 #define CHECK_DIST_Z 0.5
 #define CHECK_DIST_NEG_Z 1*/
-
+#ifndef Q_MOC_RUN
 #include <rviz/tool.h>
 
 #include <OGRE/OgreSceneNode.h>
@@ -29,7 +29,8 @@
 #include <rviz/properties/property.h>
 #include <rviz/properties/property_tree_model.h>
 
-#include <roll_test/rosbag_player.h>
+#include <cstdlib>
+#endif
 
 namespace Ogre
 {

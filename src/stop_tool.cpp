@@ -1,18 +1,8 @@
 #include <roll_test/stop_tool.h>
-#include <cstdlib>
 
 namespace roll_test
 {
 
-// BEGIN_TUTORIAL
-// Construction and destruction
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-//
-// The constructor must have no arguments, so we can't give the
-// constructor the parameters it needs to fully initialize.
-//
-// Here we set the "shortcut_key_" member variable defined in the
-// superclass to declare which key will activate the tool.
 StopTool::StopTool()
   : /*moving_flag_node_( NULL )
   , current_flag_property_( NULL )
@@ -23,10 +13,6 @@ StopTool::StopTool()
   shortcut_key_ = 's';
 }
 
-// The destructor destroys the Ogre scene nodes for the flags so they
-// disappear from the 3D scene.  The destructor for a Tool subclass is
-// only called when the tool is removed from the toolbar with the "-"
-// button.
 StopTool::~StopTool()
 {
   /*for( unsigned i = 0; i < flag_nodes_.size(); i++ )
@@ -38,21 +24,8 @@ StopTool::~StopTool()
   {
     scene_manager_->destroySceneNode( point_nodes_[ i ]);
   }*/
-
-	//delete rosbag_player_helper;
 }
 
-// onInitialize() is called by the superclass after scene_manager_ and
-// context_ are set.  It should be called only once per instantiation.
-// This is where most one-time initialization work should be done.
-// onInitialize() is called during initial instantiation of the tool
-// object.  At this point the tool has not been activated yet, so any
-// scene objects created should be invisible or disconnected from the
-// scene at this point.
-//
-// In this case we load a mesh object with the shape and appearance of
-// the flag, create an Ogre::SceneNode for the moving flag, and then
-// set it invisible.
 void StopTool::onInitialize()
 {
   /*flag_resource_ = "package://roll_test/media/flag.dae";
@@ -94,26 +67,8 @@ void StopTool::onInitialize()
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
   }*/
-	//rosbag_player_helper = new helper::RosbagPlayerHelper();
 }
 
-// Activation and deactivation
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-//
-// activate() is called when the tool is started by the user, either
-// by clicking on its button in the toolbar or by pressing its hotkey.
-//
-// First we set the moving flag node to be visible, then we create an
-// rviz::VectorProperty to show the user the position of the flag.
-// Unlike rviz::Display, rviz::Tool is not a subclass of
-// rviz::Property, so when we want to add a tool property we need to
-// get the parent container with getPropertyContainer() and add it to
-// that.
-//
-// We wouldn't have to set current_flag_property_ to be read-only, but
-// if it were writable the flag should really change position when the
-// user edits the property.  This is a fine idea, and is possible, but
-// is left as an exercise for the reader.
 void StopTool::activate()
 {
   /*if( moving_flag_node_ )
@@ -124,23 +79,16 @@ void StopTool::activate()
     current_flag_property_->setReadOnly( true );
     getPropertyContainer()->addChild( current_flag_property_ );
   }*/
+  
 
   context_->getSelectionManager()->setTextureSize(512);
   selecting_ = false;
 
   //start rosbag player in parallel
-  boost::thread player_thread(runPlayer);
+  //boost::thread player_thread(runPlayer);
   //player_thread.join();
 }
 
-// deactivate() is called when the tool is being turned off because
-// another tool has been chosen.
-//
-// We make the moving flag invisible, then delete the current flag
-// property.  Deleting a property also removes it from its parent
-// property, so that doesn't need to be done in a separate step.  If
-// we didn't delete it here, it would stay in the list of flags when
-// we switch to another tool.
 void StopTool::deactivate()
 {
   /*if( moving_flag_node_ )
@@ -313,14 +261,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 
 void runPlayer()
 {
-	try{
-		helper::RosbagPlayerHelper rosbag_player_helper;
-		
-  		rosbag_player_helper.player->publish();
-  	}
-  	catch(std::runtime_error& e){
-  		ROS_FATAL("%s\n", e.what());
-  	}
+	// RUN PLAYER FROM HERE
 }
 
 /*// This is a helper function to create a new flag in the Ogre scene and save its scene node in a list.
@@ -412,13 +353,6 @@ void StopTool::load( const rviz::Config& config )
     makeFlag( prop->getVector() );
   }
 }*/
-
-// End of .cpp file
-// ^^^^^^^^^^^^^^^^
-//
-// At the end of every plugin class implementation, we end the
-// namespace and then tell pluginlib about the class.  It is important
-// to do this in global scope, outside our package's namespace.
 
 } // end namespace rviz_plugin_tutorials
 
