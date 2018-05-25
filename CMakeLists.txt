@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## This setting causes Qt's "MOC" generation to happen automatically.
 set(CMAKE_AUTOMOC ON)
-#include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+
 #pkg_check_modules(OGRE OGRE)
 
 #include_directories( ${OGRE_INCLUDE_DIRS} )
@@ -82,14 +82,14 @@ set(SRC_FILES
   src/stop_display.cpp
   src/stop_visual.cpp
   src/stop_tool.cpp
-  src/rosbag_player.cpp
+  src/rviz_rosbag_player.cpp
 )
 
 set(HEADER_FILES
   include/${PROJECT_NAME}/stop_display.h
   include/${PROJECT_NAME}/stop_visual.h
   include/${PROJECT_NAME}/stop_tool.h
-  include/${PROJECT_NAME}/rosbag_player.h
+  include/${PROJECT_NAME}/rviz_rosbag_player.h
 )
 
 ## Declare a C++ library
@@ -106,7 +106,7 @@ target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} ${catkin_LIBRARIES})
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(gzbCntrl src/gzbControl.cpp)
-target_link_libraries(gzbCntrl ${catkin_LIBRARIES}  ${QT_LIBRARIES} ${OGRE_LIBRARIES})
+target_link_libraries(gzbCntrl ${catkin_LIBRARIES} ${QT_LIBRARIES} ${OGRE_LIBRARIES})
 
 #add_executable(stop_display src/stop_display.cpp)
 #target_link_libraries(stop_display ${catkin_LIBRARIES}  ${QT_LIBRARIES} ${OGRE_LIBRARIES})
