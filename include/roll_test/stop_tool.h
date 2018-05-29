@@ -30,6 +30,7 @@
 #include <rviz/properties/property_tree_model.h>
 
 #include <cstdlib>
+#include <roll_test/rviz_rosbag_player.h>
 #endif
 
 namespace Ogre
