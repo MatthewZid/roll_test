@@ -712,6 +712,11 @@ void TimePublisher::stepClock()
     }
 }
 
+void stepClockBackwards()
+{
+	
+}
+
 void TimePublisher::runStalledClock(const ros::WallDuration& duration)
 {
     if (do_publish_)

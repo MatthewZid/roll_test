@@ -132,6 +132,9 @@ public:
     //! Step the clock to the horizon
     void stepClock();
 
+    //! Step the clock one frame back
+    void stepClockBackwards();
+
     bool horizonReached();
 
 private:
