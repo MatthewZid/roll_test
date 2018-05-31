@@ -2,6 +2,9 @@
 #define RVIZ_CONTROL_PANEL_H
 
 #ifndef Q_MOC_RUN
+#define HSPACING 5
+#define VSPACING 15
+
 # include <ros/ros.h>
 
 # include <rviz/panel.h>
@@ -14,16 +17,23 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QTimer>
+#include <QPushButton>
+#include <QGroupBox>
 
 #include <geometry_msgs/Twist.h>
+#include <roll_test/rviz_rosbag_player.h>
 #endif
+
+namespace rviz_rosbag
+{
+class Player;
+class PlayerOptions;
+}
 
 class QLineEdit;
 
 namespace roll_test
 {
-
-class RvizQWidget;
 
 // BEGIN_TUTORIAL
 // Here we declare our new subclass of rviz::Panel.  Every panel which
@@ -47,6 +57,7 @@ public:
   // someone using the class for something else to pass in a parent
   // widget as they normally would with Qt.
   RvizCntrlPanel( QWidget* parent = 0 );
+  ~RvizCntrlPanel();
 
   // Now we declare overrides of rviz::Panel functions for saving and
   // loading data from the config file.  Here the data is the
@@ -60,12 +71,6 @@ public Q_SLOTS:
   // for ease of re-use, so here we declare a Qt slot to receive it.
   void setVel( float linear_velocity_, float angular_velocity_ );
 
-  // In this example setTopic() does not get connected to any signal
-  // (it is called directly), but it is easy to define it as a public
-  // slot instead of a private function in case it would be useful to
-  // some other user.
-  void setTopic( const QString& topic );
-
   // Here we declare some internal slots.
 protected Q_SLOTS:
   // sendvel() publishes the current velocity values to a ROS
@@ -73,18 +78,15 @@ protected Q_SLOTS:
   // times per second.
   void sendVel();
 
-  // updateTopic() reads the topic name from the QLineEdit and calls
-  // setTopic() with the result.
-  void updateTopic();
+private Q_SLOTS:
+  void handleButton();
 
   // Then we finish up with protected member variables.
 protected:
-  // The control-area widget which turns mouse events into command
-  // velocities.
-  RvizQWidget* q_widget_;
+  QPushButton* start_button_;
 
   // One-line text editor for entering the outgoing ROS topic name.
-  QLineEdit* output_topic_editor_;
+  QLineEdit* rosbag_player_input_;
 
   // The current name of the output topic.
   QString output_topic_;
@@ -94,6 +96,9 @@ protected:
 
   // The ROS node handle.
   ros::NodeHandle nh_;
+
+  //Rosbag player object
+  rviz_rosbag::Player* rosbag_player_;
 
   // The latest velocity values from the drive widget.
   float linear_velocity_;

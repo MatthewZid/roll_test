@@ -1,4 +1,3 @@
-#include <roll_test/q_widget.h>
 #include <roll_test/rviz_control_panel.h>
 
 namespace roll_test
@@ -21,20 +20,42 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   , linear_velocity_( 0 )
   , angular_velocity_( 0 )
 {
+  //initialize rosbag player
+  rviz_rosbag::PlayerOptions options;
+  options.loop = true;
+
+  rosbag_player_ = new rviz_rosbag::Player(options);
+
   // Next we lay out the "output topic" text entry field using a
   // QLabel and a QLineEdit in a QHBoxLayout.
-  QHBoxLayout* topic_layout = new QHBoxLayout;
-  topic_layout->addWidget( new QLabel( "Output Topic:" ));
-  output_topic_editor_ = new QLineEdit;
-  topic_layout->addWidget( output_topic_editor_ );
+  QGroupBox* rosbag_group = new QGroupBox("Rosbag player");
+
+  QHBoxLayout* buttons_layout = new QHBoxLayout;
+  buttons_layout->setSpacing(0);
+  start_button_ = new QPushButton("Start");
+  buttons_layout->addWidget(start_button_);
+  buttons_layout->addWidget(new QPushButton("Stop"));
+
+  QHBoxLayout* player_layout = new QHBoxLayout;
+  player_layout->setSpacing(0);
+  player_layout->addWidget(new QPushButton("Step"));
+  player_layout->addWidget(new QPushButton("Backstep"));
 
   // Then create the control widget.
-  q_widget_ = new RvizQWidget;
+  //q_widget_ = new RvizQWidget;
 
   // Lay out the topic field above the control widget.
+  QVBoxLayout* rosbag_layout = new QVBoxLayout;
+  rosbag_layout->setSpacing(VSPACING);
+  rosbag_layout->addLayout( buttons_layout );
+  rosbag_layout->addLayout(player_layout);
+
+  rosbag_group->setLayout(rosbag_layout);
+
   QVBoxLayout* layout = new QVBoxLayout;
-  layout->addLayout( topic_layout );
-  layout->addWidget( q_widget_ );
+  layout->setSpacing(VSPACING);
+  layout->addWidget(rosbag_group);
+  //rosbag_layout->addWidget( q_widget_ );
   setLayout( layout );
 
   // Create a timer for sending the output.  Motor controllers want to
@@ -46,18 +67,47 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   // QTimer is deleted by the QObject destructor when this RvizCntrlPanel
   // object is destroyed.  Therefore we don't need to keep a pointer
   // to the timer.
-  QTimer* output_timer = new QTimer( this );
+  //QTimer* output_timer = new QTimer( this );
 
   // Next we make signal/slot connections.
-  connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
-  connect( output_topic_editor_, SIGNAL( editingFinished() ), this, SLOT( updateTopic() ));
-  connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
+  connect(start_button_, SIGNAL(released()), this, SLOT(handleButton()));
+  //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
+  //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
+  //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
 
   // Start the timer.
-  output_timer->start( 100 );
+  //output_timer->start( 100 );
 
   // Make the control widget start disabled, since we don't start with an output topic.
-  q_widget_->setEnabled( false );
+  //q_widget_->setEnabled( false );
+}
+
+RvizCntrlPanel::~RvizCntrlPanel()
+{
+  delete rosbag_player_;
+}
+
+void RvizCntrlPanel::handleButton()
+{
+  QPushButton* buttonSender = qobject_cast<QPushButton*>(QObject::sender());
+  std::string button_name = buttonSender->text().toStdString();
+
+  if(button_name == "Start")
+  {
+    //Start button actions
+  }
+  else if(button_name == "Stop")
+  {  
+    //Stop button actions
+  }
+  else if(button_name == "Step")
+  {
+    //Step button actions
+  }
+  else if(button_name == "Backstep")
+  {
+    //Backstep button actions
+  }
 }
 
 // setVel() is connected to the DriveWidget's output, which is sent
@@ -70,53 +120,11 @@ void RvizCntrlPanel::setVel( float lin, float ang )
   angular_velocity_ = ang;
 }
 
-// Read the topic name from the QLineEdit and call setTopic() with the
-// results.  This is connected to QLineEdit::editingFinished() which
-// fires when the user presses Enter or Tab or otherwise moves focus
-// away.
-void RvizCntrlPanel::updateTopic()
-{
-  setTopic( output_topic_editor_->text() );
-}
-
-// Set the topic name we are publishing to.
-void RvizCntrlPanel::setTopic( const QString& new_topic )
-{
-  // Only take action if the name has changed.
-  if( new_topic != output_topic_ )
-  {
-    output_topic_ = new_topic;
-    // If the topic is the empty string, don't publish anything.
-    if( output_topic_ == "" )
-    {
-      velocity_publisher_.shutdown();
-    }
-    else
-    {
-      // The old ``velocity_publisher_`` is destroyed by this assignment,
-      // and thus the old topic advertisement is removed.  The call to
-      // nh_advertise() says we want to publish data on the new topic
-      // name.
-      velocity_publisher_ = nh_.advertise<geometry_msgs::Twist>( output_topic_.toStdString(), 1 );
-    }
-    // rviz::Panel defines the configChanged() signal.  Emitting it
-    // tells RViz that something in this panel has changed that will
-    // affect a saved config file.  Ultimately this signal can cause
-    // QWidget::setWindowModified(true) to be called on the top-level
-    // rviz::VisualizationFrame, which causes a little asterisk ("*")
-    // to show in the window's title bar indicating unsaved changes.
-    Q_EMIT configChanged();
-  }
-
-  // Gray out the control widget when the output topic is empty.
-  q_widget_->setEnabled( output_topic_ != "" );
-}
-
 // Publish the control velocities if ROS is not shutting down and the
 // publisher is ready with a valid topic name.
 void RvizCntrlPanel::sendVel()
 {
-  if( ros::ok() && velocity_publisher_ )
+  if( ros::ok() and velocity_publisher_ )
   {
     geometry_msgs::Twist msg;
     msg.linear.x = linear_velocity_;
@@ -145,8 +153,8 @@ void RvizCntrlPanel::load( const rviz::Config& config )
   QString topic;
   if( config.mapGetString( "Topic", &topic ))
   {
-    output_topic_editor_->setText( topic );
-    updateTopic();
+    rosbag_player_input_->setText( topic );
+    //updateChoice();
   }
 }
 
