@@ -1,4 +1,11 @@
 <library path="lib/libroll_test">
+  <class name="roll_test/Custom-Control-Panel"
+         type="roll_test::RvizCntrlPanel"
+         base_class_type="rviz::Panel">
+    <description>
+      A panel widget allowing rosbag player control and Point Cloud management.
+    </description>
+  </class>
   <class name="roll_test/StopSign"
          type="roll_test::StopSignDisplay"
          base_class_type="rviz::Display">
@@ -11,7 +18,7 @@
          type="roll_test::StopTool"
          base_class_type="rviz::Tool">
     <description>
-      Tool for planting flags on the ground plane in rviz.
+      Tool for selecting Point Cloud.
     </description>
   </class>
 </library>
