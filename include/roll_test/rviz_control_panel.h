@@ -4,6 +4,7 @@
 #ifndef Q_MOC_RUN
 #define HSPACING 5
 #define VSPACING 15
+#define BAGPATH "/home/mzidianakis/Ros_WS/bagfiles/"
 
 # include <ros/ros.h>
 
@@ -19,6 +20,12 @@
 #include <QTimer>
 #include <QPushButton>
 #include <QGroupBox>
+#include <QApplication>
+#include <QEventLoop>
+
+#include <boost/chrono.hpp>
+#include <boost/thread.hpp>
+#include <mutex>
 
 #include <geometry_msgs/Twist.h>
 #include <roll_test/rviz_rosbag_player.h>
@@ -31,6 +38,10 @@ class PlayerOptions;
 }
 
 class QLineEdit;
+class QPushButton;
+class QApplication;
+
+void runPlayer();
 
 namespace roll_test
 {
@@ -83,8 +94,6 @@ private Q_SLOTS:
 
   // Then we finish up with protected member variables.
 protected:
-  QPushButton* start_button_;
-
   // One-line text editor for entering the outgoing ROS topic name.
   QLineEdit* rosbag_player_input_;
 
@@ -97,8 +106,7 @@ protected:
   // The ROS node handle.
   ros::NodeHandle nh_;
 
-  //Rosbag player object
-  rviz_rosbag::Player* rosbag_player_;
+  std::vector<std::string> bag_files_;
 
   // The latest velocity values from the drive widget.
   float linear_velocity_;

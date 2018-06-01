@@ -1,5 +1,26 @@
 #include <roll_test/rviz_control_panel.h>
 
+std::mutex read_btn_mutex;
+
+QPushButton* start_button;
+QPushButton* stop_button;
+
+rviz_rosbag::Player* rosbag_player;
+
+void runPlayer()
+{
+  boost::this_thread::sleep_for(boost::chrono::seconds(1));
+  try{
+        rosbag_player->publish();
+        start_button->setEnabled(true);
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    }
+    catch(std::runtime_error& e){
+        ROS_FATAL("%s\n", e.what());
+        ros::shutdown();
+    }
+}
+
 namespace roll_test
 {
 
@@ -20,11 +41,18 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   , linear_velocity_( 0 )
   , angular_velocity_( 0 )
 {
+  //input bag files
+  bag_files_.push_back("2018-02-14-14-01-08.bag");
+  bag_files_.push_back("2018-02-14-14-07-54.bag");
+
   //initialize rosbag player
   rviz_rosbag::PlayerOptions options;
-  options.loop = true;
+  //options.loop = true;
+  std::string bagfile = BAGPATH + bag_files_[0];
+  options.bags.push_back(bagfile);
+  options.quiet = true;
 
-  rosbag_player_ = new rviz_rosbag::Player(options);
+  rosbag_player = new rviz_rosbag::Player(options);
 
   // Next we lay out the "output topic" text entry field using a
   // QLabel and a QLineEdit in a QHBoxLayout.
@@ -32,9 +60,10 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
   QHBoxLayout* buttons_layout = new QHBoxLayout;
   buttons_layout->setSpacing(0);
-  start_button_ = new QPushButton("Start");
-  buttons_layout->addWidget(start_button_);
-  buttons_layout->addWidget(new QPushButton("Stop"));
+  start_button = new QPushButton("Start");
+  stop_button = new QPushButton("Stop");
+  buttons_layout->addWidget(start_button);
+  buttons_layout->addWidget(stop_button);
 
   QHBoxLayout* player_layout = new QHBoxLayout;
   player_layout->setSpacing(0);
@@ -70,7 +99,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   //QTimer* output_timer = new QTimer( this );
 
   // Next we make signal/slot connections.
-  connect(start_button_, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
   //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
   //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
@@ -84,7 +113,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
 RvizCntrlPanel::~RvizCntrlPanel()
 {
-  delete rosbag_player_;
+  delete rosbag_player;
 }
 
 void RvizCntrlPanel::handleButton()
@@ -95,6 +124,9 @@ void RvizCntrlPanel::handleButton()
   if(button_name == "Start")
   {
     //Start button actions
+    start_button->setEnabled(false);
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    boost::thread buttonStart(runPlayer);
   }
   else if(button_name == "Stop")
   {  
