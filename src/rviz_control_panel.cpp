@@ -1,7 +1,5 @@
 #include <roll_test/rviz_control_panel.h>
 
-std::mutex read_btn_mutex;
-
 QPushButton* start_button;
 QPushButton* stop_button;
 
@@ -9,16 +7,16 @@ rviz_rosbag::Player* rosbag_player;
 
 void runPlayer()
 {
-  boost::this_thread::sleep_for(boost::chrono::seconds(1));
+  //boost::this_thread::sleep_for(boost::chrono::seconds(1));
   try{
-        rosbag_player->publish();
-        start_button->setEnabled(true);
-        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-    }
-    catch(std::runtime_error& e){
-        ROS_FATAL("%s\n", e.what());
-        ros::shutdown();
-    }
+      rosbag_player->publish();
+      Q_EMIT start_button->pressed();
+      QApplication::processEvents();
+  }
+  catch(std::runtime_error& e){
+      ROS_FATAL("%s\n", e.what());
+      ros::shutdown();
+  }
 }
 
 namespace roll_test
@@ -100,6 +98,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
   // Next we make signal/slot connections.
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
   //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
   //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
   //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
@@ -116,6 +115,11 @@ RvizCntrlPanel::~RvizCntrlPanel()
   delete rosbag_player;
 }
 
+void RvizCntrlPanel::enableStartBtn()
+{
+  start_button->setEnabled(true);
+}
+
 void RvizCntrlPanel::handleButton()
 {
   QPushButton* buttonSender = qobject_cast<QPushButton*>(QObject::sender());
@@ -125,7 +129,7 @@ void RvizCntrlPanel::handleButton()
   {
     //Start button actions
     start_button->setEnabled(false);
-    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    QApplication::processEvents();
     boost::thread buttonStart(runPlayer);
   }
   else if(button_name == "Stop")
