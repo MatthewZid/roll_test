@@ -7,7 +7,6 @@ rviz_rosbag::Player* rosbag_player;
 
 void runPlayer()
 {
-  //boost::this_thread::sleep_for(boost::chrono::seconds(1));
   try{
       rosbag_player->publish();
       Q_EMIT start_button->pressed();
@@ -48,7 +47,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   //options.loop = true;
   std::string bagfile = BAGPATH + bag_files_[0];
   options.bags.push_back(bagfile);
-  options.quiet = true;
+  //options.quiet = true;
 
   rosbag_player = new rviz_rosbag::Player(options);
 
@@ -65,8 +64,8 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
   QHBoxLayout* player_layout = new QHBoxLayout;
   player_layout->setSpacing(0);
-  player_layout->addWidget(new QPushButton("Step"));
-  player_layout->addWidget(new QPushButton("Backstep"));
+  player_layout->addWidget(new QPushButton("<<"));
+  player_layout->addWidget(new QPushButton(">>"));
 
   // Then create the control widget.
   //q_widget_ = new RvizQWidget;
@@ -99,6 +98,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   // Next we make signal/slot connections.
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
+  connect(stop_button, SIGNAL(released()), this, SLOT(handleButton()));
   //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
   //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
   //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
@@ -130,17 +130,29 @@ void RvizCntrlPanel::handleButton()
     //Start button actions
     start_button->setEnabled(false);
     QApplication::processEvents();
-    boost::thread buttonStart(runPlayer);
+    //boost::thread buttonStart(runPlayer);
+    std::thread buttonStart(runPlayer);
+    buttonStart.detach();
   }
   else if(button_name == "Stop")
   {  
     //Stop button actions
+    ROS_INFO("ATTEMPTING TO STOP...\n");
+    (rosbag_player->lock_choice_).lock();
+    rosbag_player->setChoice(' ');
+    (rosbag_player->lock_choice_).unlock();
+    ROS_INFO("STOP PRESSED\n");
+    //QApplication::processEvents();
   }
-  else if(button_name == "Step")
+  else if(button_name == ">>")
   {
     //Step button actions
+    (rosbag_player->lock_choice_).lock();
+    rosbag_player->setChoice('s');
+    (rosbag_player->lock_choice_).unlock();
+    QApplication::processEvents();
   }
-  else if(button_name == "Backstep")
+  else if(button_name == "<<")
   {
     //Backstep button actions
   }

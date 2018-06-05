@@ -4,7 +4,7 @@
 #ifndef Q_MOC_RUN
 #define HSPACING 5
 #define VSPACING 15
-#define BAGPATH "/home/matthew/Ros_WS/bagfiles/"
+#define BAGPATH "/home/mzidianakis/Ros_WS/bagfiles/"
 
 # include <ros/ros.h>
 
@@ -22,8 +22,8 @@
 #include <QGroupBox>
 #include <QApplication>
 
-#include <boost/chrono.hpp>
-#include <boost/thread.hpp>
+#include <mutex>
+#include <thread>
 
 #include <geometry_msgs/Twist.h>
 #include <roll_test/rviz_rosbag_player.h>
