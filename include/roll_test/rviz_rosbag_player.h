@@ -49,6 +49,9 @@
 #include <std_srvs/SetBool.h>
 
 #include <boost/format.hpp>
+#include <mutex>
+#include <boost/chrono.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace rosbag
 {
@@ -163,6 +166,10 @@ public:
 
     void publish();
 
+    void setChoice(char c){ choice_ = c; };
+
+    std::mutex lock_choice_;
+
 private:
     void updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event);
 
@@ -208,6 +215,9 @@ private:
 
     rosbag::TimeTranslator time_translator_;
     TimePublisher time_publisher_;
+
+    //runtime choice
+    char choice_;
 
     ros::Time start_time_;
     ros::Duration bag_length_;

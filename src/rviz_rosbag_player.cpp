@@ -91,7 +91,8 @@ Player::Player(PlayerOptions const& options) :
     // by default (it can be toggled later via 't' from the keyboard).
     pause_for_topics_(options_.pause_topics.size() > 0),
     pause_change_requested_(false),
-    requested_pause_state_(false)
+    requested_pause_state_(false),
+    choice_('-')
 {
   ros::NodeHandle private_node_handle("~");
   pause_service_ = private_node_handle.advertiseService("pause_playback", &Player::pauseCallback, this);
@@ -210,7 +211,7 @@ void Player::publish() {
     options_.advertise_sleep.sleep();
     std::cout << " done." << std::endl;
 
-    std::cout << std::endl << "Hit space to toggle paused, or 's' to step." << std::endl;
+    std::cout << std::endl << "Hit Stop to toggle paused, >> to step or << to backstep." << std::endl;
 
     paused_ = options_.start_paused;
 
@@ -244,6 +245,9 @@ void Player::publish() {
             time_publisher_.setPublishFrequency(-1.0);
 
         paused_time_ = now_wt;
+
+        //Always start with cleared choice
+        choice_ = '-';
 
         // Call do-publish for each message
         for(rosbag::MessageInstance m : view) {
@@ -463,9 +467,10 @@ void Player::doPublish(rosbag::MessageInstance const& m)
               pause_change_requested_ = false;
             }
 
-            //terminal input while player running
-            //replace this segment with rviz panel input
-            /*switch (readCharFromStdin()){
+            //rviz input while player running
+            lock_choice_.lock();
+
+            switch (choice_){
             case ' ':
                 processPause(!paused_, horizon);
                 break;
@@ -490,7 +495,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
             case 't':
                 pause_for_topics_ = !pause_for_topics_;
                 break;
-            case EOF:
+            default:
                 if (paused_)
                 {
                     printTime();
@@ -517,8 +522,12 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                 }
                 else
                     charsleftorpaused = false;
-            }*/
-            charsleftorpaused = false;  //remove this line if above section is back
+            }
+
+            choice_ = '-';
+
+            lock_choice_.unlock();
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
         }
 
         printTime();
