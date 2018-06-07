@@ -84,6 +84,7 @@ set(SRC_FILES
   src/stop_tool.cpp
   src/rviz_rosbag_player.cpp
   src/rviz_control_panel.cpp
+  src/rviz_time_translator.cpp
 )
 
 set(HEADER_FILES
@@ -92,6 +93,7 @@ set(HEADER_FILES
   include/${PROJECT_NAME}/stop_tool.h
   include/${PROJECT_NAME}/rviz_rosbag_player.h
   include/${PROJECT_NAME}/rviz_control_panel.h
+  include/${PROJECT_NAME}/rviz_time_translator.h
 )
 
 ## Declare a C++ library
