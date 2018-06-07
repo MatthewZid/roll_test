@@ -468,11 +468,13 @@ void Player::doPublish(rosbag::MessageInstance const& m)
             }
 
             //rviz input while player running
-            lock_choice_.lock();
-
             switch (choice_){
             case ' ':
                 processPause(!paused_, horizon);
+
+                lock_choice_.lock();
+            	choice_ = '-';
+            	lock_choice_.unlock();
                 break;
             case 's':
                 if (paused_) {
@@ -489,6 +491,34 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                     (pub_iter->second).publish(m);
 
                     printTime();
+
+                    lock_choice_.lock();
+                    choice_ = '-';
+                    lock_choice_.unlock();
+
+                    return;
+                }
+                break;
+            case 'b':
+                if (paused_) {
+                    time_publisher_.backstepClock();
+
+                    ros::WallDuration shift = ros::WallTime::now() - horizon ;
+                    paused_time_ = ros::WallTime::now();
+
+                    time_translator_.shiftBack(ros::Duration(shift.sec, shift.nsec));
+
+                    horizon -= shift;
+                    time_publisher_.setWCHorizon(horizon);
+            
+                    (pub_iter->second).publish(m);
+
+                    printTime();
+
+                    lock_choice_.lock();
+                    choice_ = '-';
+                    lock_choice_.unlock();
+
                     return;
                 }
                 break;
@@ -523,11 +553,6 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                 else
                     charsleftorpaused = false;
             }
-
-            choice_ = '-';
-
-            lock_choice_.unlock();
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
         }
 
         printTime();
@@ -721,9 +746,23 @@ void TimePublisher::stepClock()
     }
 }
 
-void stepClockBackwards()
+void TimePublisher::backstepClock()
 {
-	
+	if (do_publish_)
+    {
+        current_ = horizon_;
+
+        rosgraph_msgs::Clock pub_msg;
+
+        pub_msg.clock = current_;
+        time_pub_.publish(pub_msg);
+
+        ros::WallTime t = ros::WallTime::now();
+        next_pub_ = t - wall_step_;
+    }
+    else {
+        current_ = horizon_;
+    }
 }
 
 void TimePublisher::runStalledClock(const ros::WallDuration& duration)

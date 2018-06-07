@@ -38,7 +38,7 @@
 #include <ros/ros.h>
 
 #include <rosbag/bag.h>
-#include <rosbag/time_translator.h>
+#include <roll_test/rviz_time_translator.h>
 #include <rosbag/macros.h>
 #include <rosbag/message_instance.h>
 #include <rosbag/view.h>
@@ -50,8 +50,6 @@
 
 #include <boost/format.hpp>
 #include <mutex>
-#include <boost/chrono.hpp>
-#include <boost/thread/thread.hpp>
 
 namespace rosbag
 {
@@ -122,6 +120,7 @@ public:
 
     /*! Get the current time */
     ros::Time const& getTime() const;
+    bool getDoPublish(){return do_publish_;};
 
     /*! Run the clock for AT MOST duration
      *
@@ -135,8 +134,8 @@ public:
     //! Step the clock to the horizon
     void stepClock();
 
-    //! Step the clock one frame back
-    void stepClockBackwards();
+    //! Backstep the clock to the horizon
+    void backstepClock();
 
     bool horizonReached();
 
@@ -167,6 +166,8 @@ public:
     void publish();
 
     void setChoice(char c){ choice_ = c; };
+
+    void changeOptions(PlayerOptions newOptions){ options_ = newOptions; };
 
     std::mutex lock_choice_;
 
@@ -213,7 +214,7 @@ private:
     std::vector<boost::shared_ptr<rosbag::Bag> >  bags_;
     PublisherMap publishers_;
 
-    rosbag::TimeTranslator time_translator_;
+    rviz_rosbag::TimeTranslator time_translator_;
     TimePublisher time_publisher_;
 
     //runtime choice
