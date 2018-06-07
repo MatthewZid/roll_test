@@ -2,6 +2,11 @@
 
 QPushButton* start_button;
 QPushButton* stop_button;
+QPushButton* step_button;
+QPushButton* backstep_button;
+
+QCheckBox* loop_checkbox;
+QCheckBox* quiet_checkbox;
 
 rviz_rosbag::Player* rosbag_player;
 
@@ -43,13 +48,13 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   bag_files_.push_back("2018-02-14-14-07-54.bag");
 
   //initialize rosbag player
-  rviz_rosbag::PlayerOptions options;
+  options = new rviz_rosbag::PlayerOptions;
   //options.loop = true;
   std::string bagfile = BAGPATH + bag_files_[0];
-  options.bags.push_back(bagfile);
+  (options->bags).push_back(bagfile);
   //options.quiet = true;
 
-  rosbag_player = new rviz_rosbag::Player(options);
+  rosbag_player = new rviz_rosbag::Player(*options);
 
   // Next we lay out the "output topic" text entry field using a
   // QLabel and a QLineEdit in a QHBoxLayout.
@@ -64,8 +69,16 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
   QHBoxLayout* player_layout = new QHBoxLayout;
   player_layout->setSpacing(0);
-  player_layout->addWidget(new QPushButton("<<"));
-  player_layout->addWidget(new QPushButton(">>"));
+  step_button = new QPushButton(">>");
+  backstep_button = new QPushButton("<<");
+  player_layout->addWidget(backstep_button);
+  player_layout->addWidget(step_button);
+
+  QHBoxLayout* check_boxes = new QHBoxLayout;
+  loop_checkbox = new QCheckBox("Loop");
+  quiet_checkbox = new QCheckBox("Quiet");
+  check_boxes->addWidget(loop_checkbox);
+  check_boxes->addWidget(quiet_checkbox);
 
   // Then create the control widget.
   //q_widget_ = new RvizQWidget;
@@ -75,6 +88,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   rosbag_layout->setSpacing(VSPACING);
   rosbag_layout->addLayout( buttons_layout );
   rosbag_layout->addLayout(player_layout);
+  rosbag_layout->addLayout(check_boxes);
 
   rosbag_group->setLayout(rosbag_layout);
 
@@ -99,6 +113,11 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
   connect(stop_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(step_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(backstep_button, SIGNAL(released()), this, SLOT(handleButton()));
+
+  connect(loop_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
+  connect(quiet_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
   //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
   //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
   //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
@@ -112,12 +131,15 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
 RvizCntrlPanel::~RvizCntrlPanel()
 {
+  delete options;
   delete rosbag_player;
 }
 
 void RvizCntrlPanel::enableStartBtn()
 {
   start_button->setEnabled(true);
+  loop_checkbox->setEnabled(true);
+  quiet_checkbox->setEnabled(true);
 }
 
 void RvizCntrlPanel::handleButton()
@@ -129,20 +151,19 @@ void RvizCntrlPanel::handleButton()
   {
     //Start button actions
     start_button->setEnabled(false);
+    loop_checkbox->setEnabled(false);
+    quiet_checkbox->setEnabled(false);
     QApplication::processEvents();
-    //boost::thread buttonStart(runPlayer);
+
     std::thread buttonStart(runPlayer);
     buttonStart.detach();
   }
   else if(button_name == "Stop")
   {  
     //Stop button actions
-    ROS_INFO("ATTEMPTING TO STOP...\n");
     (rosbag_player->lock_choice_).lock();
     rosbag_player->setChoice(' ');
     (rosbag_player->lock_choice_).unlock();
-    ROS_INFO("STOP PRESSED\n");
-    //QApplication::processEvents();
   }
   else if(button_name == ">>")
   {
@@ -150,12 +171,37 @@ void RvizCntrlPanel::handleButton()
     (rosbag_player->lock_choice_).lock();
     rosbag_player->setChoice('s');
     (rosbag_player->lock_choice_).unlock();
-    QApplication::processEvents();
   }
   else if(button_name == "<<")
   {
     //Backstep button actions
+    (rosbag_player->lock_choice_).lock();
+    rosbag_player->setChoice('b');
+    (rosbag_player->lock_choice_).unlock();
   }
+}
+
+void RvizCntrlPanel::handleCheckBox()
+{
+	QCheckBox* checkboxSender = qobject_cast<QCheckBox*>(QObject::sender());
+	std::string checkbox_name = checkboxSender->text().toStdString();
+
+	if(checkbox_name == "&Loop")
+	{
+		if(loop_checkbox->checkState() == Qt::Checked)
+			options->loop = true;
+		else
+			options->loop = false;
+	}
+	else if(checkbox_name == "&Quiet")
+	{
+		if(quiet_checkbox->checkState() == Qt::Checked)
+			options->quiet = true;
+		else
+			options->quiet = false;
+	}
+
+	rosbag_player->changeOptions(*options);
 }
 
 // setVel() is connected to the DriveWidget's output, which is sent

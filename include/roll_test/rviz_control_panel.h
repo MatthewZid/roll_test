@@ -21,6 +21,7 @@
 #include <QPushButton>
 #include <QGroupBox>
 #include <QApplication>
+#include <QCheckBox>
 
 #include <mutex>
 #include <thread>
@@ -90,6 +91,7 @@ protected Q_SLOTS:
 private Q_SLOTS:
   void handleButton();
   void enableStartBtn();
+  void handleCheckBox();
 
   // Then we finish up with protected member variables.
 protected:
@@ -106,6 +108,8 @@ protected:
   ros::NodeHandle nh_;
 
   std::vector<std::string> bag_files_;
+
+  rviz_rosbag::PlayerOptions* options;
 
   // The latest velocity values from the drive widget.
   float linear_velocity_;
