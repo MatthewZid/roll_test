@@ -211,7 +211,7 @@ void Player::publish() {
     options_.advertise_sleep.sleep();
     std::cout << " done." << std::endl;
 
-    std::cout << std::endl << "Hit Stop to toggle paused, >> to step or << to backstep." << std::endl;
+    std::cout << std::endl << "Hit Pause to toggle paused, >> to step or << to backstep." << std::endl;
 
     paused_ = options_.start_paused;
 
