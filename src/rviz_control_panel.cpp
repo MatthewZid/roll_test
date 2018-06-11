@@ -1,7 +1,7 @@
 #include <roll_test/rviz_control_panel.h>
 
 QPushButton* start_button;
-QPushButton* stop_button;
+QPushButton* pause_button;
 QPushButton* step_button;
 QPushButton* backstep_button;
 
@@ -63,9 +63,10 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   QHBoxLayout* buttons_layout = new QHBoxLayout;
   buttons_layout->setSpacing(0);
   start_button = new QPushButton("Start");
-  stop_button = new QPushButton("Stop");
+  pause_button = new QPushButton("Pause");
+  pause_button->setEnabled(false);
   buttons_layout->addWidget(start_button);
-  buttons_layout->addWidget(stop_button);
+  buttons_layout->addWidget(pause_button);
 
   QHBoxLayout* player_layout = new QHBoxLayout;
   player_layout->setSpacing(0);
@@ -112,7 +113,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   // Next we make signal/slot connections.
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
-  connect(stop_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(pause_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(step_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(backstep_button, SIGNAL(released()), this, SLOT(handleButton()));
 
@@ -140,6 +141,9 @@ void RvizCntrlPanel::enableStartBtn()
   start_button->setEnabled(true);
   loop_checkbox->setEnabled(true);
   quiet_checkbox->setEnabled(true);
+
+  pause_button->setText("Pause");
+  pause_button->setEnabled(false);
 }
 
 void RvizCntrlPanel::handleButton()
@@ -151,6 +155,7 @@ void RvizCntrlPanel::handleButton()
   {
     //Start button actions
     start_button->setEnabled(false);
+    pause_button->setEnabled(true);
     loop_checkbox->setEnabled(false);
     quiet_checkbox->setEnabled(false);
     QApplication::processEvents();
@@ -158,12 +163,17 @@ void RvizCntrlPanel::handleButton()
     std::thread buttonStart(runPlayer);
     buttonStart.detach();
   }
-  else if(button_name == "Stop")
+  else if(button_name == "Pause" or button_name == "Resume")
   {  
     //Stop button actions
     (rosbag_player->lock_choice_).lock();
     rosbag_player->setChoice(' ');
     (rosbag_player->lock_choice_).unlock();
+
+    if(button_name == "Pause")
+      pause_button->setText("Resume");
+    else
+      pause_button->setText("Pause");
   }
   else if(button_name == ">>")
   {
