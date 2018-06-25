@@ -242,8 +242,15 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			{
 				QModelIndex child_index = model->index(i, 0);
 				rviz::Property *child = model->getProp(child_index);
-				ROS_INFO("Name %d: %s\n", i, (child->getNameStd()).c_str());
-				//rviz::VectorProperty *subchild = (rviz::VecorProperty*) child->childAt(0);
+				//ROS_INFO("Name %d: %s\n", i, (child->getNameStd()).c_str());
+				rviz::VectorProperty *vec_child = (rviz::VectorProperty*) child->childAt(0);
+				Ogre::Vector3 pc_vec = vec_child->getVector();
+
+				rviz::ColorProperty* color_child = (rviz::ColorProperty*) child->childAt(1);
+				rviz::FloatProperty* alpha_child = (rviz::FloatProperty*) child->childAt(2);
+				Ogre::ColourValue pc_colour = color_child->getOgreColor();
+
+				ROS_INFO("Color of %d: %f, %f, %f\n", i, pc_colour.r, pc_colour.g, pc_colour.b);
 			}
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
@@ -257,11 +264,6 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 		sel_manager->highlight(event.viewport, event.x, event.y, event.x, event.y);
 
 	return flags;
-}
-
-void runPlayer()
-{
-	// RUN PLAYER FROM HERE
 }
 
 /*// This is a helper function to create a new flag in the Ogre scene and save its scene node in a list.

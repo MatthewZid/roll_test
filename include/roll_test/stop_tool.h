@@ -26,27 +26,26 @@
 #include <rviz/geometry.h>
 
 #include <rviz/properties/vector_property.h>
+#include <rviz/properties/color_property.h>
+#include <rviz/properties/float_property.h>
 #include <rviz/properties/property.h>
 #include <rviz/properties/property_tree_model.h>
 
 #include <cstdlib>
-#include <roll_test/rviz_rosbag_player.h>
 #endif
 
 namespace Ogre
 {
 class SceneNode;
 class Vector3;
-}
-
-namespace helper
-{
-class RosbagPlayerHelper;
+class ColourValue;
 }
 
 namespace rviz
 {
 class VectorProperty;
+class ColorProperty;
+class FloatProperty;
 class VisualizationManager;
 class ViewportMouseEvent;
 class SelectionManager;
@@ -56,7 +55,6 @@ class Property;
 
 namespace roll_test
 {
-  void runPlayer();
 
 // BEGIN_TUTORIAL
 // Here we declare our new subclass of rviz::Tool.  Every tool
