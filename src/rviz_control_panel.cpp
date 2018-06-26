@@ -5,6 +5,8 @@ QPushButton* pause_button;
 QPushButton* step_button;
 QPushButton* backstep_button;
 
+QPushButton* cancel_loop_button;
+
 QCheckBox* loop_checkbox;
 QCheckBox* quiet_checkbox;
 
@@ -46,11 +48,12 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   //input bag files
   bag_files_.push_back("2018-02-14-14-01-08.bag");
   bag_files_.push_back("2018-02-14-14-07-54.bag");
+  bag_files_.push_back("2018-06-26-15-20-58.bag");
 
   //initialize rosbag player
   options = new rviz_rosbag::PlayerOptions;
   //options.loop = true;
-  std::string bagfile = BAGPATH + bag_files_[0];
+  std::string bagfile = BAGPATH + bag_files_[2];
   (options->bags).push_back(bagfile);
   //options.quiet = true;
 
@@ -72,8 +75,15 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   player_layout->setSpacing(0);
   step_button = new QPushButton(">>");
   backstep_button = new QPushButton("<<");
+  step_button->setEnabled(false);
+  backstep_button->setEnabled(false);
   player_layout->addWidget(backstep_button);
   player_layout->addWidget(step_button);
+
+  QHBoxLayout* cancel_layout = new QHBoxLayout;
+  cancel_loop_button = new QPushButton("Terminate");
+  cancel_loop_button->setEnabled(false);
+  cancel_layout->addWidget(cancel_loop_button);
 
   QHBoxLayout* check_boxes = new QHBoxLayout;
   loop_checkbox = new QCheckBox("Loop");
@@ -89,6 +99,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   rosbag_layout->setSpacing(VSPACING);
   rosbag_layout->addLayout( buttons_layout );
   rosbag_layout->addLayout(player_layout);
+  rosbag_layout->addLayout(cancel_layout);
   rosbag_layout->addLayout(check_boxes);
 
   rosbag_group->setLayout(rosbag_layout);
@@ -116,6 +127,8 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   connect(pause_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(step_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(backstep_button, SIGNAL(released()), this, SLOT(handleButton()));
+
+  connect(cancel_loop_button, SIGNAL(released()), this, SLOT(handleButton()));
 
   connect(loop_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
   connect(quiet_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
@@ -156,8 +169,18 @@ void RvizCntrlPanel::handleButton()
     //Start button actions
     start_button->setEnabled(false);
     pause_button->setEnabled(true);
+    step_button->setEnabled(true);
+    backstep_button->setEnabled(true);
+
     loop_checkbox->setEnabled(false);
     quiet_checkbox->setEnabled(false);
+
+    if(loop_checkbox->isChecked()){
+      options->loop = true;
+      rosbag_player->changeOptions(*options);
+      cancel_loop_button->setEnabled(true);
+    }
+
     QApplication::processEvents();
 
     std::thread buttonStart(runPlayer);
@@ -188,6 +211,17 @@ void RvizCntrlPanel::handleButton()
     (rosbag_player->lock_choice_).lock();
     rosbag_player->setChoice('b');
     (rosbag_player->lock_choice_).unlock();
+  }
+  else if(button_name == "Term&inate")
+  {
+    //Terminate loop
+    options->loop = false;
+    rosbag_player->changeOptions(*options);
+    rosbag_player->setTerminate(true);
+    pause_button->setEnabled(false);
+    step_button->setEnabled(false);
+    backstep_button->setEnabled(false);
+    cancel_loop_button->setEnabled(false);
   }
 }
 
