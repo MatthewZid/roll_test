@@ -92,7 +92,8 @@ Player::Player(PlayerOptions const& options) :
     pause_for_topics_(options_.pause_topics.size() > 0),
     pause_change_requested_(false),
     requested_pause_state_(false),
-    choice_('-')
+    choice_('-'),
+    terminate_(false)
 {
   ros::NodeHandle private_node_handle("~");
   pause_service_ = private_node_handle.advertiseService("pause_playback", &Player::pauseCallback, this);
@@ -248,6 +249,9 @@ void Player::publish() {
 
         //Always start with cleared choice
         choice_ = '-';
+
+        //Don't start terminated
+        terminate_ = false;
 
         // Call do-publish for each message
         for(rosbag::MessageInstance m : view) {
@@ -454,10 +458,10 @@ void Player::doPublish(rosbag::MessageInstance const& m)
         }
     }
 
-    while ((paused_ or delayed_ or !time_publisher_.horizonReached()) and node_handle_.ok())
+    while ((paused_ or delayed_ or !time_publisher_.horizonReached()) and !terminate_ and node_handle_.ok())
     {
         bool charsleftorpaused = true;
-        while (charsleftorpaused and node_handle_.ok())
+        while (charsleftorpaused and !terminate_ and node_handle_.ok())
         {
             ros::spinOnce();
 
@@ -487,7 +491,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
 
                     horizon += shift;
                     time_publisher_.setWCHorizon(horizon);
-            
+
                     (pub_iter->second).publish(m);
 
                     printTime();

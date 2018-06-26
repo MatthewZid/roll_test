@@ -167,6 +167,8 @@ public:
 
     void setChoice(char c){ choice_ = c; };
 
+    void setTerminate(bool t){ terminate_ = t; };
+
     void changeOptions(PlayerOptions newOptions){ options_ = newOptions; };
 
     std::mutex lock_choice_;
@@ -219,6 +221,9 @@ private:
 
     //runtime choice
     char choice_;
+
+    //terminate loop in pause
+    bool terminate_;
 
     ros::Time start_time_;
     ros::Duration bag_length_;
