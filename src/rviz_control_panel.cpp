@@ -1,5 +1,7 @@
 #include <roll_test/rviz_control_panel.h>
 
+QComboBox* bagmenu;
+
 QPushButton* start_button;
 QPushButton* pause_button;
 QPushButton* step_button;
@@ -52,16 +54,26 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
   //initialize rosbag player
   options = new rviz_rosbag::PlayerOptions;
-  //options.loop = true;
   std::string bagfile = BAGPATH + bag_files_[2];
   (options->bags).push_back(bagfile);
-  //options.quiet = true;
 
   rosbag_player = new rviz_rosbag::Player(*options);
 
   // Next we lay out the "output topic" text entry field using a
   // QLabel and a QLineEdit in a QHBoxLayout.
   QGroupBox* rosbag_group = new QGroupBox("Rosbag player");
+
+  QHBoxLayout* bag_layout = new QHBoxLayout;
+  QLabel* label = new QLabel;
+  bagmenu = new QComboBox;
+  label->setText("Bag file:");
+  label->setAlignment(Qt::AlignLeft);
+  bagmenu->insertItem(0, QString((bag_files_[2] + " (Moving)").c_str()));
+  bagmenu->insertItem(1, QString((bag_files_[0] + " (Still)").c_str()));
+  bagmenu->insertItem(2, QString((bag_files_[1] + " (Still)").c_str()));
+  bagmenu->setEditable(false);
+  bag_layout->addWidget(label);
+  bag_layout->addWidget(bagmenu);
 
   QHBoxLayout* buttons_layout = new QHBoxLayout;
   buttons_layout->setSpacing(0);
@@ -97,6 +109,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   // Lay out the topic field above the control widget.
   QVBoxLayout* rosbag_layout = new QVBoxLayout;
   rosbag_layout->setSpacing(VSPACING);
+  rosbag_layout->addLayout(bag_layout);
   rosbag_layout->addLayout( buttons_layout );
   rosbag_layout->addLayout(player_layout);
   rosbag_layout->addLayout(cancel_layout);
@@ -122,6 +135,9 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   //QTimer* output_timer = new QTimer( this );
 
   // Next we make signal/slot connections.
+  //connect(bagmenu, QOverload<int>::of(&QComboBox::activated), [=](int index){bagSelect(index);});
+  connect(bagmenu, SIGNAL(activated(int)), this, SLOT(bagSelect(int)));
+
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
   connect(pause_button, SIGNAL(released()), this, SLOT(handleButton()));
@@ -149,12 +165,29 @@ RvizCntrlPanel::~RvizCntrlPanel()
   delete rosbag_player;
 }
 
+void RvizCntrlPanel::bagSelect(int index)
+{
+  std::string bagfile;
+  options->bags.clear();
+
+  if(index == 0)
+    bagfile = BAGPATH + bag_files_[2];
+  else if(index == 1)
+    bagfile = BAGPATH + bag_files_[0];
+  else if(index == 2)
+    bagfile = BAGPATH + bag_files_[1];
+
+  options->bags.push_back(bagfile);
+  rosbag_player->changeOptions(*options);
+}
+
 void RvizCntrlPanel::enableStartBtn()
 {
   start_button->setEnabled(true);
+
   loop_checkbox->setEnabled(true);
   quiet_checkbox->setEnabled(true);
-
+  bagmenu->setEnabled(true);
   pause_button->setText("Pause");
   pause_button->setEnabled(false);
 }
@@ -168,6 +201,7 @@ void RvizCntrlPanel::handleButton()
   {
     //Start button actions
     start_button->setEnabled(false);
+    bagmenu->setEnabled(false);
     pause_button->setEnabled(true);
     step_button->setEnabled(true);
     backstep_button->setEnabled(true);

@@ -13,11 +13,14 @@
 #include <stdio.h>
 
 #include <QPainter>
+#include <QString>
 #include <QLineEdit>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QTimer>
+
+#include <QComboBox>
 #include <QPushButton>
 #include <QGroupBox>
 #include <QApplication>
@@ -89,9 +92,13 @@ protected Q_SLOTS:
   void sendVel();
 
 private Q_SLOTS:
+  void bagSelect(int index);
   void handleButton();
   void enableStartBtn();
   void handleCheckBox();
+
+//private:
+  //void bagSelect(int index);
 
   // Then we finish up with protected member variables.
 protected:
