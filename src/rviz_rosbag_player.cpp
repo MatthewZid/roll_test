@@ -110,6 +110,7 @@ void Player::publish() {
     // Open all the bag files
     for(std::string const& filename : options_.bags) {
         ROS_INFO("Opening %s", filename.c_str());
+        bags_.clear();
 
         try
         {
@@ -212,7 +213,7 @@ void Player::publish() {
     options_.advertise_sleep.sleep();
     std::cout << " done." << std::endl;
 
-    std::cout << std::endl << "Hit Pause to toggle paused, >> to step or << to backstep." << std::endl;
+    std::cout << std::endl << "Hit Pause to toggle paused, >> to step or << to step back." << std::endl;
 
     paused_ = options_.start_paused;
 
@@ -270,7 +271,10 @@ void Player::publish() {
             break;
         }
         if (!options_.loop) {
-            std::cout << std::endl << "Done." << std::endl;
+        	if(!terminate_)
+            	std::cout << std::endl << "Done." << std::endl;
+            else
+            	std::cout << std::endl << "Terminated." << std::endl;
             break;
         }
     }
