@@ -120,7 +120,6 @@ public:
 
     /*! Get the current time */
     ros::Time const& getTime() const;
-    bool getDoPublish(){return do_publish_;};
 
     /*! Run the clock for AT MOST duration
      *
