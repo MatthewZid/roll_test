@@ -154,6 +154,10 @@ private:
     ros::WallTime wc_horizon_;
     ros::Time horizon_;
     ros::Time current_;
+
+    //keep previous and pre-previous time
+    ros::Time previous_;
+    ros::Time pre_previous_;
 };
 
 class ROSBAG_DECL Player
