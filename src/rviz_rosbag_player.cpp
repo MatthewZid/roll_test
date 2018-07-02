@@ -239,7 +239,6 @@ void Player::publish() {
         ros::WallTime now_wt = ros::WallTime::now();
         time_translator_.setTranslatedStartTime(ros::Time(now_wt.sec, now_wt.nsec));
 
-
         time_publisher_.setTimeScale(options_.time_scale);
         if (options_.bag_time)
             time_publisher_.setPublishFrequency(options_.bag_time_frequency);
@@ -511,15 +510,29 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                 if (paused_) {
                     time_publisher_.backstepClock();
 
-                    ros::WallDuration shift = ros::WallTime::now() - horizon ;
+                    ros::WallDuration shift = ros::WallTime::now() - time_publisher_.getPrevWC() ;
                     paused_time_ = ros::WallTime::now();
 
                     time_translator_.shiftBack(ros::Duration(shift.sec, shift.nsec));
 
                     horizon -= shift;
                     time_publisher_.setWCHorizon(horizon);
-            
-                    (pub_iter->second).publish(m);
+                    
+                    std::vector<rosbag::MessageInstance>& mv = time_publisher_.getMsgVec();
+
+                    std::string const& prevcid = time_publisher_.getPrevCallerId();
+                    std::map<std::string, ros::Publisher>::iterator prev_pub_iter = publishers_.find(prevcid);
+                    ROS_ASSERT(prev_pub_iter != publishers_.end());
+
+                    // Update subscribers.
+                    ros::spinOnce();
+
+                    if(!time_publisher_.checkEmpty()){
+                        (prev_pub_iter->second).publish(mv.back());
+                        mv.pop_back();
+                    }
+                    else
+                        ROS_WARN("Empty info vectors!\n");
 
                     printTime();
 
@@ -565,6 +578,10 @@ void Player::doPublish(rosbag::MessageInstance const& m)
 
         printTime();
         time_publisher_.runClock(ros::WallDuration(.1));
+
+        //keep time info
+        time_publisher_.insertPassedTime(time_publisher_.getTime(), horizon, m, callerid_topic);
+
         ros::spinOnce();
     }
 
@@ -639,6 +656,22 @@ TimePublisher::TimePublisher() : time_scale_(1.0)
   time_pub_ = node_handle_.advertise<rosgraph_msgs::Clock>("clock",1);
 }
 
+void TimePublisher::insertPassedTime(ros::Time const& t, ros::WallTime const& wt, rosbag::MessageInstance const& m, std::string cid)
+{
+    passed_time_.push_back(t);
+    passed_walltime_.push_back(wt);
+    passed_msg_.push_back(m);
+    passed_pubs_.push_back(cid);
+}
+
+bool TimePublisher::checkEmpty()
+{
+    if(passed_time_.empty() or passed_walltime_.empty() or passed_msg_.empty() or passed_pubs_.empty())
+        return true;
+    else
+        return false;
+}
+
 void TimePublisher::setPublishFrequency(double publish_frequency)
 {
     publish_frequency_ = publish_frequency;
@@ -671,6 +704,22 @@ void TimePublisher::setTime(const ros::Time& time)
 ros::Time const& TimePublisher::getTime() const
 {
     return current_;
+}
+
+ros::WallTime TimePublisher::getPrevWC()
+{
+    ros::WallTime pt = passed_walltime_.back();
+    passed_walltime_.pop_back();
+
+    return pt;
+}
+
+std::string TimePublisher::getPrevCallerId()
+{
+    std::string cid = passed_pubs_.back();
+    passed_pubs_.pop_back();
+
+    return cid;
 }
 
 void TimePublisher::runClock(const ros::WallDuration& duration)
@@ -769,7 +818,8 @@ void TimePublisher::backstepClock()
         next_pub_ = t - wall_step_;
     }
     else {
-        current_ = horizon_;
+        current_ = passed_time_.back();
+        passed_time_.pop_back();
     }
 }
 

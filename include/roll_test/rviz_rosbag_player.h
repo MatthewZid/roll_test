@@ -105,6 +105,13 @@ public:
      */
     TimePublisher();
 
+    void insertPassedTime(ros::Time const& t, ros::WallTime const& wt, rosbag::MessageInstance const& m, std::string cid);
+
+    ros::WallTime getPrevWC();
+    std::string getPrevCallerId();
+    std::vector<rosbag::MessageInstance>& getMsgVec(){ return passed_msg_; };
+    bool checkEmpty();
+
     void setPublishFrequency(double publish_frequency);
     
     void setTimeScale(double time_scale);
@@ -155,9 +162,11 @@ private:
     ros::Time horizon_;
     ros::Time current_;
 
-    //keep previous and pre-previous time
-    ros::Time previous_;
-    ros::Time pre_previous_;
+    //track previous time info
+    std::vector<ros::Time> passed_time_;
+    std::vector<ros::WallTime> passed_walltime_;
+    std::vector<rosbag::MessageInstance> passed_msg_;
+    std::vector<std::string> passed_pubs_;
 };
 
 class ROSBAG_DECL Player
