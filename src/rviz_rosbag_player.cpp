@@ -255,10 +255,10 @@ void Player::publish() {
 
         // Call do-publish for each message
         for(rosbag::MessageInstance m : view) {
-            if (!node_handle_.ok())
+            if (!node_handle_.ok() or terminate_)
                 break;
 
-            doPublish(m);
+            	doPublish(m);
         }
 
         if (options_.keep_alive)
@@ -271,9 +271,15 @@ void Player::publish() {
         }
         if (!options_.loop) {
         	if(!terminate_)
-            	std::cout << std::endl << "Done." << std::endl;
+            	std::cout << std::endl << "Done.\n" << std::endl;
             else
-            	std::cout << std::endl << "Terminated." << std::endl;
+            	std::cout << std::endl << "Terminated.\n" << std::endl;
+
+            time_publisher_.clearInfo();
+
+            for(boost::shared_ptr<rosbag::Bag> bag : bags_)
+        		bag->close();
+
             break;
         }
     }
@@ -474,6 +480,9 @@ void Player::doPublish(rosbag::MessageInstance const& m)
               pause_change_requested_ = false;
             }
 
+            //if(paused_)
+            	//choice_ = 'b';
+
             //rviz input while player running
             switch (choice_){
             case ' ':
@@ -531,8 +540,11 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                         (prev_pub_iter->second).publish(mv.back());
                         mv.pop_back();
                     }
-                    else
-                        ROS_WARN("Empty info vectors!\n");
+                    else{
+                        ROS_WARN("Back to start! Terminating...\n");
+                        terminate_ = true;
+                        options_.loop = false;
+                    }
 
                     printTime();
 
@@ -670,6 +682,14 @@ bool TimePublisher::checkEmpty()
         return true;
     else
         return false;
+}
+
+void TimePublisher::clearInfo()
+{
+	passed_time_.clear();
+	passed_walltime_.clear();
+	passed_msg_.clear();
+	passed_pubs_.clear();
 }
 
 void TimePublisher::setPublishFrequency(double publish_frequency)

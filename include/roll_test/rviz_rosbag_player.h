@@ -111,6 +111,7 @@ public:
     std::string getPrevCallerId();
     std::vector<rosbag::MessageInstance>& getMsgVec(){ return passed_msg_; };
     bool checkEmpty();
+    void clearInfo();
 
     void setPublishFrequency(double publish_frequency);
     
