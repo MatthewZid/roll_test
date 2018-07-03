@@ -51,6 +51,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   bag_files_.push_back("2018-02-14-14-01-08.bag");
   bag_files_.push_back("2018-02-14-14-07-54.bag");
   bag_files_.push_back("2018-06-26-15-20-58.bag");
+  bag_files_.push_back("ss2_lsN_sc1A_ru08_cg_v.bag");
 
   //initialize rosbag player
   options = new rviz_rosbag::PlayerOptions;
@@ -71,6 +72,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   bagmenu->insertItem(0, QString((bag_files_[2] + " (Moving)").c_str()));
   bagmenu->insertItem(1, QString((bag_files_[0] + " (Still)").c_str()));
   bagmenu->insertItem(2, QString((bag_files_[1] + " (Still)").c_str()));
+  bagmenu->insertItem(3, QString((bag_files_[3]).c_str()));
   bagmenu->setEditable(false);
   bag_layout->addWidget(label);
   bag_layout->addWidget(bagmenu);
@@ -176,6 +178,8 @@ void RvizCntrlPanel::bagSelect(int index)
     bagfile = BAGPATH + bag_files_[0];
   else if(index == 2)
     bagfile = BAGPATH + bag_files_[1];
+  else if(index == 3)
+    bagfile = BAGPATH + bag_files_[3];
 
   options->bags.push_back(bagfile);
   rosbag_player->changeOptions(*options);
@@ -188,6 +192,9 @@ void RvizCntrlPanel::enableStartBtn()
   loop_checkbox->setEnabled(true);
   quiet_checkbox->setEnabled(true);
   bagmenu->setEnabled(true);
+  step_button->setEnabled(false);
+  backstep_button->setEnabled(false);
+  cancel_loop_button->setEnabled(false);
   pause_button->setText("Pause");
   pause_button->setEnabled(false);
 }
