@@ -47,8 +47,7 @@ public:
 
     void      setTimeScale(double const& s);
     void      setRealStartTime(ros::Time const& t);
-    void      setTranslatedStartTime(ros::Time const& t);  
-    ros::Time getTranslatedStartTime(){return translated_start_;};
+    void      setTranslatedStartTime(ros::Time const& t);
     void      shift(ros::Duration const& d);  
     void 	  shiftBack(ros::Duration const& d);             
     ros::Time translate(ros::Time const& t);
@@ -57,6 +56,7 @@ private:
     double    time_scale_;
     ros::Time real_start_;
     ros::Time translated_start_;
+    ros::Time translated_start_keep_;
 };
 
 } // namespace rosbag
