@@ -253,6 +253,10 @@ void Player::publish() {
         //Don't start terminated
         terminate_ = false;
 
+        //Categorize messages
+        for(rosbag::MessageInstance m : view)
+            msg_set_.insert(m.getTopic());
+
         // Call do-publish for each message
         for(rosbag::MessageInstance m : view) {
             if (!node_handle_.ok() or terminate_)
