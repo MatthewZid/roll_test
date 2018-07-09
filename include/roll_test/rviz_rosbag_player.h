@@ -238,7 +238,7 @@ private:
     //terminate loop in pause
     bool terminate_;
 
-    std::set<std::string> msg_set_;
+    std::vector< std::vector<rosbag::MessageInstance> > msg_vec_;
 
     ros::Time start_time_;
     ros::Duration bag_length_;

@@ -222,6 +222,28 @@ void Player::publish() {
         waitForSubscribers();
     }
 
+    //Categorize messages
+    std::set<std::string> msg_set;
+
+    for(rosbag::MessageInstance m : view)
+        msg_set.insert(m.getTopic());
+
+    int msg_size = msg_set.size();
+
+    msg_vec_.resize(msg_size);
+
+    for(rosbag::MessageInstance m : view){
+        auto it = msg_set.find(m.getTopic());
+
+        if(it != msg_set.end()){
+            int pos = std::distance(msg_set.begin(), it);
+
+            msg_vec_.at(pos).push_back(m);
+        }
+        else
+            ROS_WARN("%s topic not found!\n", m.getTopic().c_str());
+    }
+
     while (true) {
         // Set up our time_translator and publishers
 
@@ -253,10 +275,6 @@ void Player::publish() {
         //Don't start terminated
         terminate_ = false;
 
-        //Categorize messages
-        for(rosbag::MessageInstance m : view)
-            msg_set_.insert(m.getTopic());
-
         // Call do-publish for each message
         for(rosbag::MessageInstance m : view) {
             if (!node_handle_.ok() or terminate_)
@@ -280,6 +298,11 @@ void Player::publish() {
             	std::cout << std::endl << "Terminated.\n" << std::endl;
 
             time_publisher_.clearInfo();
+
+            for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++)
+                it->clear();
+
+            msg_vec_.clear();
 
             for(boost::shared_ptr<rosbag::Bag> bag : bags_)
         		bag->close();
