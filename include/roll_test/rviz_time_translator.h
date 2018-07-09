@@ -56,7 +56,6 @@ private:
     double    time_scale_;
     ros::Time real_start_;
     ros::Time translated_start_;
-    ros::Time translated_start_keep_;
 };
 
 } // namespace rosbag

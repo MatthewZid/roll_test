@@ -37,7 +37,7 @@
 namespace rviz_rosbag {
 
 TimeTranslator::TimeTranslator()
-    : time_scale_(1.0), real_start_(ros::TIME_MIN), translated_start_(ros::TIME_MIN), translated_start_keep_(ros::TIME_MIN)
+    : time_scale_(1.0), real_start_(ros::TIME_MIN), translated_start_(ros::TIME_MIN)
 {
 }
 
