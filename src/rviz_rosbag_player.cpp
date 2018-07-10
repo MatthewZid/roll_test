@@ -34,6 +34,12 @@
 
 #include <roll_test/rviz_rosbag_player.h>
 
+void publish_thread(rviz_rosbag::Player* this_obj, std::vector< std::vector<rosbag::MessageInstance> >::iterator it, int pos)
+{
+    for(rosbag::MessageInstance m: *it)
+        this_obj->doPublish(m, pos);
+}
+
 namespace rviz_rosbag
 {
 
@@ -228,9 +234,9 @@ void Player::publish() {
     for(rosbag::MessageInstance m : view)
         msg_set.insert(m.getTopic());
 
-    int msg_size = msg_set.size();
+    int msg_type_num = msg_set.size();
 
-    msg_vec_.resize(msg_size);
+    msg_vec_.resize(msg_type_num);
 
     for(rosbag::MessageInstance m : view){
         auto it = msg_set.find(m.getTopic());
@@ -244,28 +250,42 @@ void Player::publish() {
             ROS_WARN("%s topic not found!\n", m.getTopic().c_str());
     }
 
+    time_publisher_ = new TimePublisher[msg_type_num];
+    time_translator_ = new rviz_rosbag::TimeTranslator[msg_type_num];
+
     while (true) {
         // Set up our time_translator and publishers
 
-        time_translator_.setTimeScale(options_.time_scale);
+        for(int i = 0; i < msg_type_num; i++)
+            time_translator_[i].setTimeScale(options_.time_scale);
 
         start_time_ = view.begin()->getTime();
-        time_translator_.setRealStartTime(start_time_);
+
+        for(int i = 0; i < msg_type_num; i++)
+            time_translator_[i].setRealStartTime(start_time_);
+
         bag_length_ = view.getEndTime() - view.getBeginTime();
 
         // Set the last rate control to now, so the program doesn't start delayed.
         last_rate_control_ = start_time_;
 
-        time_publisher_.setTime(start_time_);
+        for(int i = 0; i < msg_type_num; i++)
+            time_publisher_[i].setTime(start_time_);
 
         ros::WallTime now_wt = ros::WallTime::now();
-        time_translator_.setTranslatedStartTime(ros::Time(now_wt.sec, now_wt.nsec));
 
-        time_publisher_.setTimeScale(options_.time_scale);
+        for(int i = 0; i < msg_type_num; i++)
+            time_translator_[i].setTranslatedStartTime(ros::Time(now_wt.sec, now_wt.nsec));
+
+        for(int i = 0; i < msg_type_num; i++)
+            time_publisher_[i].setTimeScale(options_.time_scale);
+
         if (options_.bag_time)
-            time_publisher_.setPublishFrequency(options_.bag_time_frequency);
+            for(int i = 0; i < msg_type_num; i++)
+                time_publisher_[i].setPublishFrequency(options_.bag_time_frequency);
         else
-            time_publisher_.setPublishFrequency(-1.0);
+            for(int i = 0; i < msg_type_num; i++)
+                time_publisher_[i].setPublishFrequency(-1.0);
 
         paused_time_ = now_wt;
 
@@ -275,17 +295,35 @@ void Player::publish() {
         //Don't start terminated
         terminate_ = false;
 
-        // Call do-publish for each message
+        /*// Call do-publish for each message (ORIGINAL)
         for(rosbag::MessageInstance m : view) {
             if (!node_handle_.ok() or terminate_)
                 break;
 
             	doPublish(m);
+        }*/
+
+        //Call doPublish for each message type in thread
+        std::vector<std::thread> msg_threads;
+        int pos = 0;
+
+        for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++){
+            if(!node_handle_.ok() or terminate_)
+                break;
+
+            msg_threads.push_back(std::thread(publish_thread, this, it, pos++));
         }
 
-        if (options_.keep_alive)
+        if(node_handle_.ok() and !terminate_)
+            for(int i = 0; i < msg_threads.size(); i++)
+                msg_threads[i].join();
+
+        //UPDATE BELOW PIECE OF CODE TO BE RUN IN THREAD
+        ////////////////////////////////
+        /*if (options_.keep_alive)
             while (node_handle_.ok())
-                doKeepAlive();
+                doKeepAlive();*/
+        ////////////////////////////////
 
         if (!node_handle_.ok()) {
             std::cout << std::endl;
@@ -297,12 +335,16 @@ void Player::publish() {
             else
             	std::cout << std::endl << "Terminated.\n" << std::endl;
 
-            time_publisher_.clearInfo();
+            for(int i = 0; i < msg_type_num; i++)
+                time_publisher_[i].clearInfo();
 
             for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++)
                 it->clear();
 
             msg_vec_.clear();
+
+            delete[] time_translator_;
+            delete[] time_publisher_;
 
             for(boost::shared_ptr<rosbag::Bag> bag : bags_)
         		bag->close();
@@ -350,26 +392,26 @@ void Player::updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShift
     last_rate_control_ = ros::Time(header_timestamp_sec, header_timestamp_nsec);
 }
 
-void Player::printTime()
+void Player::printTime(int thread_id)
 {
     if (!options_.quiet) {
 
-        ros::Time current_time = time_publisher_.getTime();
+        ros::Time current_time = time_publisher_[thread_id].getTime();
         ros::Duration d = current_time - start_time_;
 
 
         if (paused_)
         {
-            printf("\r [PAUSED ]  Bag Time: %13.6f   Duration: %.6f / %.6f               \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec());
+            printf("\r [PAUSED ]  Bag Time: %13.6f   Duration: %.6f / %.6f               \r", time_publisher_[thread_id].getTime().toSec(), d.toSec(), bag_length_.toSec());
         }
         else if (delayed_)
         {
             ros::Duration time_since_rate = std::max(ros::Time::now() - last_rate_control_, ros::Duration(0));
-            printf("\r [DELAYED]  Bag Time: %13.6f   Duration: %.6f / %.6f   Delay: %.2f \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec(), time_since_rate.toSec());
+            printf("\r [DELAYED]  Bag Time: %13.6f   Duration: %.6f / %.6f   Delay: %.2f \r", time_publisher_[thread_id].getTime().toSec(), d.toSec(), bag_length_.toSec(), time_since_rate.toSec());
         }
         else
         {
-            printf("\r [RUNNING]  Bag Time: %13.6f   Duration: %.6f / %.6f               \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec());
+            printf("\r [RUNNING]  Bag Time: %13.6f   Duration: %.6f / %.6f               \r", time_publisher_[thread_id].getTime().toSec(), d.toSec(), bag_length_.toSec());
         }
         fflush(stdout);
     }
@@ -394,7 +436,7 @@ bool Player::pauseCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::R
     return true;
 }
 
-void Player::processPause(const bool paused, ros::WallTime &horizon)
+void Player::processPause(const bool paused, ros::WallTime &horizon, int thread_id)
 {
     paused_ = paused;
 
@@ -408,10 +450,10 @@ void Player::processPause(const bool paused, ros::WallTime &horizon)
     ros::WallDuration shift = ros::WallTime::now() - paused_time_;
     paused_time_ = ros::WallTime::now();
 
-    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+    time_translator_[thread_id].shift(ros::Duration(shift.sec, shift.nsec));
 
     horizon += shift;
-    time_publisher_.setWCHorizon(horizon);
+    time_publisher_[thread_id].setWCHorizon(horizon);
   }
 }
 
@@ -429,17 +471,17 @@ void Player::waitForSubscribers() const
     std::cout << "Finished waiting for subscribers." << std::endl;
 }
 
-void Player::doPublish(rosbag::MessageInstance const& m)
+void Player::doPublish(rosbag::MessageInstance const& m, int thread_id)
 {
     std::string const& topic   = m.getTopic();
     ros::Time const& time = m.getTime();
     std::string callerid       = m.getCallerId();
     
-    ros::Time translated = time_translator_.translate(time);
+    ros::Time translated = time_translator_[thread_id].translate(time);
     ros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
 
-    time_publisher_.setHorizon(time);
-    time_publisher_.setWCHorizon(horizon);
+    time_publisher_[thread_id].setHorizon(time);
+    time_publisher_[thread_id].setWCHorizon(horizon);
 
     std::string callerid_topic = callerid + topic;
 
@@ -451,23 +493,23 @@ void Player::doPublish(rosbag::MessageInstance const& m)
 
     // If immediate specified, play immediately
     if (options_.at_once) {
-        time_publisher_.stepClock();
+        time_publisher_[thread_id].stepClock();
         pub_iter->second.publish(m);
-        printTime();
+        printTime(thread_id);
         return;
     }
 
     // If skip_empty is specified, skip this region and shift.
-    if (time - time_publisher_.getTime() > options_.skip_empty)
+    if (time - time_publisher_[thread_id].getTime() > options_.skip_empty)
     {
-      time_publisher_.stepClock();
+      time_publisher_[thread_id].stepClock();
 
       ros::WallDuration shift = ros::WallTime::now() - horizon ;
-      time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+      time_translator_[thread_id].shift(ros::Duration(shift.sec, shift.nsec));
       horizon += shift;
-      time_publisher_.setWCHorizon(horizon);
+      time_publisher_[thread_id].setWCHorizon(horizon);
       (pub_iter->second).publish(m);
-      printTime();
+      printTime(thread_id);
       return;
     }
 
@@ -488,13 +530,13 @@ void Player::doPublish(rosbag::MessageInstance const& m)
     // Check if the rate control topic has posted recently enough to continue, or if a delay is needed.
     // Delayed is separated from paused to allow more verbose printing.
     if (rate_control_sub_ != NULL) {
-        if ((time_publisher_.getTime() - last_rate_control_).toSec() > options_.rate_control_max_delay) {
+        if ((time_publisher_[thread_id].getTime() - last_rate_control_).toSec() > options_.rate_control_max_delay) {
             delayed_ = true;
             paused_time_ = ros::WallTime::now();
         }
     }
 
-    while ((paused_ or delayed_ or !time_publisher_.horizonReached()) and !terminate_ and node_handle_.ok())
+    while ((paused_ or delayed_ or !time_publisher_[thread_id].horizonReached()) and !terminate_ and node_handle_.ok())
     {
         bool charsleftorpaused = true;
         while (charsleftorpaused and !terminate_ and node_handle_.ok())
@@ -503,7 +545,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
 
             if (pause_change_requested_)
             {
-              processPause(requested_pause_state_, horizon);
+              processPause(requested_pause_state_, horizon, thread_id);
               pause_change_requested_ = false;
             }
 
@@ -513,7 +555,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
             //rviz input while player running
             switch (choice_){
             case ' ':
-                processPause(!paused_, horizon);
+                processPause(!paused_, horizon, thread_id);
 
                 lock_choice_.lock();
             	choice_ = '-';
@@ -521,19 +563,19 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                 break;
             case 's':
                 if (paused_) {
-                    time_publisher_.stepClock();
+                    time_publisher_[thread_id].stepClock();
 
                     ros::WallDuration shift = ros::WallTime::now() - horizon ;
                     paused_time_ = ros::WallTime::now();
 
-                    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+                    time_translator_[thread_id].shift(ros::Duration(shift.sec, shift.nsec));
 
                     horizon += shift;
-                    time_publisher_.setWCHorizon(horizon);
+                    time_publisher_[thread_id].setWCHorizon(horizon);
 
                     (pub_iter->second).publish(m);
 
-                    printTime();
+                    printTime(thread_id);
 
                     lock_choice_.lock();
                     choice_ = '-';
@@ -544,26 +586,26 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                 break;
             case 'b':
                 if (paused_) {
-                    time_publisher_.backstepClock();
+                    time_publisher_[thread_id].backstepClock();
 
-                    ros::WallDuration shift = ros::WallTime::now() - time_publisher_.getPrevWC() ;
+                    ros::WallDuration shift = ros::WallTime::now() - time_publisher_[thread_id].getPrevWC() ;
                     paused_time_ = ros::WallTime::now();
 
-                    time_translator_.shiftBack(ros::Duration(shift.sec, shift.nsec));
+                    time_translator_[thread_id].shiftBack(ros::Duration(shift.sec, shift.nsec));
 
                     horizon -= shift;
-                    time_publisher_.setWCHorizon(horizon);
+                    time_publisher_[thread_id].setWCHorizon(horizon);
                     
-                    std::vector<rosbag::MessageInstance>& mv = time_publisher_.getMsgVec();
+                    std::vector<rosbag::MessageInstance>& mv = time_publisher_[thread_id].getMsgVec();
 
-                    std::string const& prevcid = time_publisher_.getPrevCallerId();
+                    std::string const& prevcid = time_publisher_[thread_id].getPrevCallerId();
                     std::map<std::string, ros::Publisher>::iterator prev_pub_iter = publishers_.find(prevcid);
                     ROS_ASSERT(prev_pub_iter != publishers_.end());
 
                     // Update subscribers.
                     ros::spinOnce();
 
-                    if(!time_publisher_.checkEmpty()){
+                    if(!time_publisher_[thread_id].checkEmpty()){
                         (prev_pub_iter->second).publish(mv.back());
                         mv.pop_back();
                     }
@@ -573,7 +615,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                         options_.loop = false;
                     }
 
-                    printTime();
+                    printTime(thread_id);
 
                     lock_choice_.lock();
                     choice_ = '-';
@@ -588,26 +630,26 @@ void Player::doPublish(rosbag::MessageInstance const& m)
             default:
                 if (paused_)
                 {
-                    printTime();
-                    time_publisher_.runStalledClock(ros::WallDuration(.1));
+                    printTime(thread_id);
+                    time_publisher_[thread_id].runStalledClock(ros::WallDuration(.1));
                     ros::spinOnce();
                 }
                 else if (delayed_)
                 {
-                    printTime();
-                    time_publisher_.runStalledClock(ros::WallDuration(.1));
+                    printTime(thread_id);
+                    time_publisher_[thread_id].runStalledClock(ros::WallDuration(.1));
                     ros::spinOnce();
                     // You need to check the rate here too.
-                    if(rate_control_sub_ == NULL || (time_publisher_.getTime() - last_rate_control_).toSec() <= options_.rate_control_max_delay) {
+                    if(rate_control_sub_ == NULL || (time_publisher_[thread_id].getTime() - last_rate_control_).toSec() <= options_.rate_control_max_delay) {
                         delayed_ = false;
                         // Make sure time doesn't shift after leaving delay.
                         ros::WallDuration shift = ros::WallTime::now() - paused_time_;
                         paused_time_ = ros::WallTime::now();
          
-                        time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+                        time_translator_[thread_id].shift(ros::Duration(shift.sec, shift.nsec));
 
                         horizon += shift;
-                        time_publisher_.setWCHorizon(horizon);
+                        time_publisher_[thread_id].setWCHorizon(horizon);
                     }
                 }
                 else
@@ -615,11 +657,11 @@ void Player::doPublish(rosbag::MessageInstance const& m)
             }
         }
 
-        printTime();
-        time_publisher_.runClock(ros::WallDuration(.1));
+        printTime(thread_id);
+        time_publisher_[thread_id].runClock(ros::WallDuration(.1));
 
         //keep time info
-        time_publisher_.insertPassedTime(time_publisher_.getTime(), horizon, m, callerid_topic);
+        time_publisher_[thread_id].insertPassedTime(time_publisher_[thread_id].getTime(), horizon, m, callerid_topic);
 
         ros::spinOnce();
     }
@@ -627,16 +669,16 @@ void Player::doPublish(rosbag::MessageInstance const& m)
     pub_iter->second.publish(m);
 }
 
-void Player::doKeepAlive()
+void Player::doKeepAlive(int thread_id)
 {
     //Keep pushing ourself out in 10-sec increments (avoids fancy math dealing with the end of time)
-    ros::Time const& time = time_publisher_.getTime() + ros::Duration(10.0);
+    ros::Time const& time = time_publisher_[thread_id].getTime() + ros::Duration(10.0);
 
-    ros::Time translated = time_translator_.translate(time);
+    ros::Time translated = time_translator_[thread_id].translate(time);
     ros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
 
-    time_publisher_.setHorizon(time);
-    time_publisher_.setWCHorizon(horizon);
+    time_publisher_[thread_id].setHorizon(time);
+    time_publisher_[thread_id].setWCHorizon(horizon);
 
     if (options_.at_once) {
         return;
@@ -645,7 +687,7 @@ void Player::doKeepAlive()
     // If we're done and just staying alive, don't watch the rate control topic. We aren't publishing anyway.
     delayed_ = false;
 
-    while ((paused_ or !time_publisher_.horizonReached()) and node_handle_.ok())
+    while ((paused_ or !time_publisher_[thread_id].horizonReached()) and node_handle_.ok())
     {
         bool charsleftorpaused = true;
         while (charsleftorpaused and node_handle_.ok())
@@ -683,8 +725,8 @@ void Player::doKeepAlive()
             charsleftorpaused = false;  //remove this line if above section is back
         }
 
-        printTime();
-        time_publisher_.runClock(ros::WallDuration(.1));
+        printTime(thread_id);
+        time_publisher_[thread_id].runClock(ros::WallDuration(.1));
         ros::spinOnce();
     }
 }

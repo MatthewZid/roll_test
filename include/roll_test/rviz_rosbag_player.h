@@ -50,6 +50,9 @@
 
 #include <boost/format.hpp>
 #include <mutex>
+#include <thread>
+
+#define MASTER_IDX 3
 
 namespace rosbag
 {
@@ -178,6 +181,8 @@ public:
 
     void publish();
 
+    void doPublish(rosbag::MessageInstance const& m, int thread_id);
+
     void setChoice(char c){ choice_ = c; };
 
     void setTerminate(bool t){ terminate_ = t; };
@@ -189,15 +194,13 @@ public:
 private:
     void updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event);
 
-    void doPublish(rosbag::MessageInstance const& m);
+    void doKeepAlive(int thread_id);
 
-    void doKeepAlive();
-
-    void printTime();
+    void printTime(int thread_id);
 
     bool pauseCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
-    void processPause(const bool paused, ros::WallTime &horizon);
+    void processPause(const bool paused, ros::WallTime &horizon, int thread_id);
 
     void waitForSubscribers() const;
 
@@ -229,8 +232,8 @@ private:
     std::vector<boost::shared_ptr<rosbag::Bag> >  bags_;
     PublisherMap publishers_;
 
-    rviz_rosbag::TimeTranslator time_translator_;
-    TimePublisher time_publisher_;
+    rviz_rosbag::TimeTranslator *time_translator_;
+    TimePublisher *time_publisher_;
 
     //runtime choice
     char choice_;
