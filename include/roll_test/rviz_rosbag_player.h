@@ -50,7 +50,6 @@
 
 #include <boost/format.hpp>
 #include <mutex>
-#include <thread>
 
 #define MASTER_IDX 3
 
@@ -181,8 +180,6 @@ public:
 
     void publish();
 
-    void doPublish(rosbag::MessageInstance const& m, int thread_id);
-
     void setChoice(char c){ choice_ = c; };
 
     void setTerminate(bool t){ terminate_ = t; };
@@ -194,13 +191,15 @@ public:
 private:
     void updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event);
 
-    void doKeepAlive(int thread_id);
+    void doPublish(rosbag::MessageInstance const& m);
 
-    void printTime(int thread_id);
+    void doKeepAlive();
+
+    void printTime();
 
     bool pauseCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
-    void processPause(const bool paused, ros::WallTime &horizon, int thread_id);
+    void processPause(const bool paused, ros::WallTime &horizon);
 
     void waitForSubscribers() const;
 
@@ -232,8 +231,8 @@ private:
     std::vector<boost::shared_ptr<rosbag::Bag> >  bags_;
     PublisherMap publishers_;
 
-    rviz_rosbag::TimeTranslator *time_translator_;
-    TimePublisher *time_publisher_;
+    rviz_rosbag::TimeTranslator time_translator_;
+    TimePublisher time_publisher_;
 
     //runtime choice
     char choice_;
@@ -242,6 +241,9 @@ private:
     bool terminate_;
 
     std::vector< std::vector<rosbag::MessageInstance> > msg_vec_;
+
+    //master topic position
+    int max_topic_pos_;
 
     ros::Time start_time_;
     ros::Duration bag_length_;
