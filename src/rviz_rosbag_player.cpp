@@ -245,7 +245,7 @@ void Player::publish() {
             ROS_WARN("%s topic not found!\n", m.getTopic().c_str());
     }
 
-    //Find category with max topics; master topic is in position max_topic_pos_
+    /*//Find category with max topics; master topic is in position max_topic_pos_
     long max_topics = -1;
 
     for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++){
@@ -254,6 +254,9 @@ void Player::publish() {
             max_topic_pos_ = std::distance(msg_vec_.begin(), it);
         }
     }
+
+    for(int i = 0; i < msg_type_num; i++)
+    	closest_pos_.push_back(0);*/
 
     while (true) {
         // Set up our time_translator and publishers
@@ -295,13 +298,21 @@ void Player::publish() {
             	doPublish(m);
         }*/
 
-        //Call doPublish for master topic
-        for(auto it = msg_vec_.at(max_topic_pos_).begin(); it != msg_vec_.at(max_topic_pos_).end(); it++){
+        // Call do-publish for each message (ORIGINAL)
+        for(auto it = view.begin(); it != view.end(); it++) {
             if (!node_handle_.ok() or terminate_)
                 break;
 
             doPublish(*it);
         }
+
+        /*//Call doPublish for master topic
+        for(auto it = msg_vec_.at(max_topic_pos_).begin(); it != msg_vec_.at(max_topic_pos_).end(); it++){
+            if (!node_handle_.ok() or terminate_)
+                break;
+
+            doPublish(*it);
+        }*/
 
         if (options_.keep_alive)
             while (node_handle_.ok())
@@ -565,7 +576,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                 break;
             case 'b':
                 if (paused_) {
-                    time_publisher_.backstepClock();
+                   	time_publisher_.backstepClock();
 
                     ros::WallDuration shift = ros::WallTime::now() - time_publisher_.getPrevWC() ;
                     paused_time_ = ros::WallTime::now();
@@ -586,6 +597,14 @@ void Player::doPublish(rosbag::MessageInstance const& m)
 
                     if(!time_publisher_.checkEmpty()){
                         (prev_pub_iter->second).publish(mv.back());
+
+                        //publish closest topics to previous master topic
+                    	for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++){
+                    		if(mv.back().getTopic() != it->at(0).getTopic()){
+                    			//find closest topic to previous topic
+                    		}
+                    	}
+
                         mv.pop_back();
                     }
                     else{

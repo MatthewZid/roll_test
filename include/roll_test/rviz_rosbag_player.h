@@ -245,6 +245,9 @@ private:
     //master topic position
     int max_topic_pos_;
 
+    //psoitions of closest time frame to master topic
+    std::vector<int> closest_pos_;
+
     ros::Time start_time_;
     ros::Duration bag_length_;
 };
