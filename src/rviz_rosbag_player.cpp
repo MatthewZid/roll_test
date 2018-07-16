@@ -573,6 +573,11 @@ void Player::doPublish(rosbag::MessageInstance const& m)
 
                     return;
                 }
+
+                lock_choice_.lock();
+                choice_ = '-';
+                lock_choice_.unlock();
+
                 break;
             case 'b':
                 if (paused_) {
@@ -596,12 +601,45 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                     ros::spinOnce();
 
                     if(!time_publisher_.checkEmpty()){
-                        (prev_pub_iter->second).publish(mv.back());
+                        (prev_pub_iter->second).publish(mv.back()); //publish previous message
 
                         //publish closest topics to previous master topic
+                        float previous_topic_time = mv.back().getTime().toSec();
+
                     	for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++){
                     		if(mv.back().getTopic() != it->at(0).getTopic()){
                     			//find closest topic to previous topic
+                                float min_time_dist = 10000.0f;
+                                std::vector<rosbag::MessageInstance>::iterator min_msg;
+
+                                for(auto msg_it = it->begin(); msg_it != it->end(); msg_it++){
+                                    float topic_time = msg_it->getTime().toSec();
+
+                                    if(topic_time <= previous_topic_time){
+                                        float time_dist = previous_topic_time - topic_time;
+
+                                        if(time_dist < min_time_dist){
+                                            min_time_dist = time_dist;
+                                            min_msg = msg_it;
+                                        }
+                                    }
+                                    else{
+                                        ROS_WARN("Future messages ahead...\n");
+                                        break;
+                                    }
+                                }
+
+                                std::string const& min_callerid = min_msg->getCallerId();
+                                std::string const& min_topic = min_msg->getTopic();
+                                std::string min_callerid_topic = min_callerid + min_topic;
+
+                                std::map<std::string, ros::Publisher>::iterator min_pub_iter = publishers_.find(min_callerid_topic);
+                                ROS_ASSERT(min_pub_iter != publishers_.end());
+
+                                // Update subscribers.
+                                ros::spinOnce();
+
+                                (min_pub_iter->second).publish(*min_msg);
                     		}
                     	}
 
@@ -621,6 +659,11 @@ void Player::doPublish(rosbag::MessageInstance const& m)
 
                     return;
                 }
+
+                lock_choice_.lock();
+                choice_ = '-';
+                lock_choice_.unlock();
+
                 break;
             case 't':
                 pause_for_topics_ = !pause_for_topics_;
