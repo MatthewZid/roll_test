@@ -92,7 +92,7 @@ protected Q_SLOTS:
   void sendVel();
 
 private Q_SLOTS:
-  void bagSelect(int index);
+  void bagSelect(const int index);
   void handleButton();
   void enableStartBtn();
   void handleCheckBox();

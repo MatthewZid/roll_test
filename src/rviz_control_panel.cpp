@@ -138,7 +138,8 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
   // Next we make signal/slot connections.
   //connect(bagmenu, QOverload<int>::of(&QComboBox::activated), [=](int index){bagSelect(index);});
-  connect(bagmenu, SIGNAL(activated(int)), this, SLOT(bagSelect(int)));
+  qRegisterMetaType< QVector<int> >("QVector<int>");  //fixes QVector<int> error in conncet
+  connect(bagmenu, SIGNAL(activated(int)), this, SLOT(bagSelect(const int)));
 
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
@@ -167,7 +168,7 @@ RvizCntrlPanel::~RvizCntrlPanel()
   delete rosbag_player;
 }
 
-void RvizCntrlPanel::bagSelect(int index)
+void RvizCntrlPanel::bagSelect(const int index)
 {
   std::string bagfile;
   options->bags.clear();
