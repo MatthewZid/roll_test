@@ -267,6 +267,9 @@ void Player::publish() {
         time_translator_.setRealStartTime(start_time_);
         bag_length_ = view.getEndTime() - view.getBeginTime();
 
+        //secure max value
+        max_time_dist_ = (bag_length_ + ros::Duration(SECURE_OFFSET)).toSec();
+
         // Set the last rate control to now, so the program doesn't start delayed.
         last_rate_control_ = start_time_;
 
@@ -298,7 +301,7 @@ void Player::publish() {
             	doPublish(m);
         }*/
 
-        // Call do-publish for each message (ORIGINAL)
+        // Call do-publish for each message (with iterator)
         for(auto it = view.begin(); it != view.end(); it++) {
             if (!node_handle_.ok() or terminate_)
                 break;
@@ -460,7 +463,7 @@ void Player::waitForSubscribers() const
     std::cout << "Finished waiting for subscribers." << std::endl;
 }
 
-void Player::doPublish(rosbag::MessageInstance const& m)
+int Player::doPublish(rosbag::MessageInstance const& m)
 {
     std::string const& topic   = m.getTopic();
     ros::Time const& time = m.getTime();
@@ -485,7 +488,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
         time_publisher_.stepClock();
         pub_iter->second.publish(m);
         printTime();
-        return;
+        return 0;
     }
 
     // If skip_empty is specified, skip this region and shift.
@@ -499,7 +502,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
       time_publisher_.setWCHorizon(horizon);
       (pub_iter->second).publish(m);
       printTime();
-      return;
+      return 0;
     }
 
     if (pause_for_topics_)
@@ -539,8 +542,12 @@ void Player::doPublish(rosbag::MessageInstance const& m)
               pause_change_requested_ = false;
             }
 
-            //if(paused_)
-            	//choice_ = 'b';
+//////////// For automated backstep selection after one Pause button click ////////////
+
+            /*if(paused_)
+            	choice_ = 'b';*/
+
+///////////////////////////////////////////////////////////////////////////////////////
 
             //rviz input while player running
             switch (choice_){
@@ -571,7 +578,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                     choice_ = '-';
                     lock_choice_.unlock();
 
-                    return;
+                    return 0;
                 }
 
                 lock_choice_.lock();
@@ -604,42 +611,49 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                         (prev_pub_iter->second).publish(mv.back()); //publish previous message
 
                         //publish closest topics to previous master topic
-                        float previous_topic_time = mv.back().getTime().toSec();
+                        ros::Time const& previous_topic_time = mv.back().getTime();
+                        ROS_WARN("\nPrevious topic: %s\nPrevious time: %lf\n", mv.back().getTopic().c_str(), previous_topic_time.toSec());
 
                     	for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++){
                     		if(mv.back().getTopic() != it->at(0).getTopic()){
+
                     			//find closest topic to previous topic
-                                float min_time_dist = 10000.0f;
+                                ros::Duration min_time_dist(max_time_dist_);
                                 std::vector<rosbag::MessageInstance>::iterator min_msg;
+                                bool min_found = false;
 
                                 for(auto msg_it = it->begin(); msg_it != it->end(); msg_it++){
-                                    float topic_time = msg_it->getTime().toSec();
+                                    ros::Time const& topic_time = msg_it->getTime();
+                                    ros::Duration time_dist = previous_topic_time - topic_time;
 
-                                    if(topic_time <= previous_topic_time){
-                                        float time_dist = previous_topic_time - topic_time;
-
+                                    if(time_dist >= ros::Duration(0.0)){
                                         if(time_dist < min_time_dist){
                                             min_time_dist = time_dist;
                                             min_msg = msg_it;
+                                            min_found = true;
                                         }
                                     }
-                                    else{
-                                        ROS_WARN("Future messages ahead...\n");
+                                    else
                                         break;
-                                    }
                                 }
 
-                                std::string const& min_callerid = min_msg->getCallerId();
-                                std::string const& min_topic = min_msg->getTopic();
-                                std::string min_callerid_topic = min_callerid + min_topic;
+                                if(min_found){
+                                    std::string const& min_callerid = min_msg->getCallerId();
+                                    std::string const& min_topic = min_msg->getTopic();
+                                    std::string min_callerid_topic = min_callerid + min_topic;
 
-                                std::map<std::string, ros::Publisher>::iterator min_pub_iter = publishers_.find(min_callerid_topic);
-                                ROS_ASSERT(min_pub_iter != publishers_.end());
+                                    std::map<std::string, ros::Publisher>::iterator min_pub_iter = publishers_.find(min_callerid_topic);
+                                    ROS_ASSERT(min_pub_iter != publishers_.end());
 
-                                // Update subscribers.
-                                ros::spinOnce();
+                                    // Update subscribers.
+                                    ros::spinOnce();
 
-                                (min_pub_iter->second).publish(*min_msg);
+                                    ROS_INFO("\nMin topic: %s\nMin time: %lf\n", min_topic.c_str(), min_msg->getTime().toSec());
+
+                                    (min_pub_iter->second).publish(*min_msg);
+                                }
+                                else
+                                    ROS_WARN("No more past topics!\n");
                     		}
                     	}
 
@@ -657,7 +671,7 @@ void Player::doPublish(rosbag::MessageInstance const& m)
                     choice_ = '-';
                     lock_choice_.unlock();
 
-                    return;
+                    return 1;
                 }
 
                 lock_choice_.lock();
@@ -708,6 +722,8 @@ void Player::doPublish(rosbag::MessageInstance const& m)
     }
 
     pub_iter->second.publish(m);
+
+    return 0;
 }
 
 void Player::doKeepAlive()

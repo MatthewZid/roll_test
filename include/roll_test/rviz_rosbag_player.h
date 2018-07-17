@@ -51,7 +51,7 @@
 #include <boost/format.hpp>
 #include <mutex>
 
-#define MASTER_IDX 3
+#define SECURE_OFFSET 10.0
 
 namespace rosbag
 {
@@ -191,7 +191,7 @@ public:
 private:
     void updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event);
 
-    void doPublish(rosbag::MessageInstance const& m);
+    int doPublish(rosbag::MessageInstance const& m);
 
     void doKeepAlive();
 
@@ -247,6 +247,9 @@ private:
 
     //psoitions of closest time frame to master topic
     std::vector<int> closest_pos_;
+
+    //initial secure value of min_dist(minimum distance between master topic and candidate topic)
+    double max_time_dist_;
 
     ros::Time start_time_;
     ros::Duration bag_length_;
