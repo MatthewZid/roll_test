@@ -95,6 +95,8 @@ struct ROSBAG_DECL PlayerOptions
     float    rate_control_max_delay;
     ros::Duration skip_empty;
 
+    bool sync_topics;
+
     std::vector<std::string> bags;
     std::vector<std::string> topics;
     std::vector<std::string> pause_topics;
@@ -204,6 +206,9 @@ private:
     void waitForSubscribers() const;
 
     bool isPaused(){ return paused_; };
+
+    //syncing topics to master topic mv
+    void syncTopics(rosbag::MessageInstance const& mv);
 
 private:
     typedef std::map<std::string, ros::Publisher> PublisherMap;

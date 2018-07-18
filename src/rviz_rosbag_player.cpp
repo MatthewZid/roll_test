@@ -71,7 +71,8 @@ PlayerOptions::PlayerOptions() :
     wait_for_subscribers(false),
     rate_control_topic(""),
     rate_control_max_delay(1.0f),
-    skip_empty(ros::DURATION_MAX)
+    skip_empty(ros::DURATION_MAX),
+    sync_topics(false)
 {
 }
 
@@ -463,6 +464,56 @@ void Player::waitForSubscribers() const
     std::cout << "Finished waiting for subscribers." << std::endl;
 }
 
+void Player::syncTopics(rosbag::MessageInstance const& mv)
+{
+    //publish closest topics to previous master topic
+    ros::Time const& previous_topic_time = mv.getTime();
+    ROS_WARN("\nPrevious topic: %s\nPrevious time: %lf\n", mv.getTopic().c_str(), previous_topic_time.toSec());
+
+    for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++){
+        if(mv.getTopic() != it->at(0).getTopic()){
+
+            //find closest topic to previous topic
+            ros::Duration min_time_dist(max_time_dist_);
+            std::vector<rosbag::MessageInstance>::iterator min_msg;
+            bool min_found = false;
+
+            for(auto msg_it = it->begin(); msg_it != it->end(); msg_it++){
+                ros::Time const& topic_time = msg_it->getTime();
+                ros::Duration time_dist = previous_topic_time - topic_time;
+
+                if(time_dist >= ros::Duration(0.0)){
+                    if(time_dist < min_time_dist){
+                        min_time_dist = time_dist;
+                        min_msg = msg_it;
+                        min_found = true;
+                    }
+                }
+                else
+                    break;
+            }
+
+            if(min_found){
+                std::string const& min_callerid = min_msg->getCallerId();
+                std::string const& min_topic = min_msg->getTopic();
+                std::string min_callerid_topic = min_callerid + min_topic;
+
+                std::map<std::string, ros::Publisher>::iterator min_pub_iter = publishers_.find(min_callerid_topic);
+                ROS_ASSERT(min_pub_iter != publishers_.end());
+
+                // Update subscribers.
+                ros::spinOnce();
+
+                ROS_INFO("\nMin topic: %s\nMin time: %lf\n", min_topic.c_str(), min_msg->getTime().toSec());
+
+                (min_pub_iter->second).publish(*min_msg);
+            }
+            else
+                ROS_WARN("No more past topics!\n");
+        }
+    }
+}
+
 int Player::doPublish(rosbag::MessageInstance const& m)
 {
     std::string const& topic   = m.getTopic();
@@ -572,6 +623,12 @@ int Player::doPublish(rosbag::MessageInstance const& m)
 
                     (pub_iter->second).publish(m);
 
+                    //keep time info
+                    time_publisher_.insertPassedTime(time_publisher_.getTime(), horizon, m, callerid_topic);
+
+                    if(options_.sync_topics)
+                        syncTopics(m);
+
                     printTime();
 
                     lock_choice_.lock();
@@ -608,56 +665,14 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                     ros::spinOnce();
 
                     if(!time_publisher_.checkEmpty()){
+                        mv.pop_back();
+
                         (prev_pub_iter->second).publish(mv.back()); //publish previous message
 
-                        //publish closest topics to previous master topic
-                        ros::Time const& previous_topic_time = mv.back().getTime();
-                        ROS_WARN("\nPrevious topic: %s\nPrevious time: %lf\n", mv.back().getTopic().c_str(), previous_topic_time.toSec());
+                        if(options_.sync_topics)
+                            syncTopics(mv.back());
 
-                    	for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++){
-                    		if(mv.back().getTopic() != it->at(0).getTopic()){
-
-                    			//find closest topic to previous topic
-                                ros::Duration min_time_dist(max_time_dist_);
-                                std::vector<rosbag::MessageInstance>::iterator min_msg;
-                                bool min_found = false;
-
-                                for(auto msg_it = it->begin(); msg_it != it->end(); msg_it++){
-                                    ros::Time const& topic_time = msg_it->getTime();
-                                    ros::Duration time_dist = previous_topic_time - topic_time;
-
-                                    if(time_dist >= ros::Duration(0.0)){
-                                        if(time_dist < min_time_dist){
-                                            min_time_dist = time_dist;
-                                            min_msg = msg_it;
-                                            min_found = true;
-                                        }
-                                    }
-                                    else
-                                        break;
-                                }
-
-                                if(min_found){
-                                    std::string const& min_callerid = min_msg->getCallerId();
-                                    std::string const& min_topic = min_msg->getTopic();
-                                    std::string min_callerid_topic = min_callerid + min_topic;
-
-                                    std::map<std::string, ros::Publisher>::iterator min_pub_iter = publishers_.find(min_callerid_topic);
-                                    ROS_ASSERT(min_pub_iter != publishers_.end());
-
-                                    // Update subscribers.
-                                    ros::spinOnce();
-
-                                    ROS_INFO("\nMin topic: %s\nMin time: %lf\n", min_topic.c_str(), min_msg->getTime().toSec());
-
-                                    (min_pub_iter->second).publish(*min_msg);
-                                }
-                                else
-                                    ROS_WARN("No more past topics!\n");
-                    		}
-                    	}
-
-                        mv.pop_back();
+                        //mv.pop_back();
                     }
                     else{
                         ROS_WARN("Back to start! Terminating...\n");
