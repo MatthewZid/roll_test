@@ -11,6 +11,7 @@ QPushButton* cancel_loop_button;
 
 QCheckBox* loop_checkbox;
 QCheckBox* quiet_checkbox;
+QCheckBox* sync_topics_checkbox;
 
 rviz_rosbag::Player* rosbag_player;
 
@@ -102,8 +103,10 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   QHBoxLayout* check_boxes = new QHBoxLayout;
   loop_checkbox = new QCheckBox("Loop");
   quiet_checkbox = new QCheckBox("Quiet");
+  sync_topics_checkbox = new QCheckBox("Sync Topics");
   check_boxes->addWidget(loop_checkbox);
   check_boxes->addWidget(quiet_checkbox);
+  check_boxes->addWidget(sync_topics_checkbox);
 
   // Then create the control widget.
   //q_widget_ = new RvizQWidget;
@@ -151,6 +154,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
 
   connect(loop_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
   connect(quiet_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
+  connect(sync_topics_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
   //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
   //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
   //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
@@ -286,6 +290,13 @@ void RvizCntrlPanel::handleCheckBox()
 		else
 			options->quiet = false;
 	}
+  else if(checkbox_name == "S&ync Topics")
+  {
+    if(sync_topics_checkbox->checkState() == Qt::Checked)
+      options->sync_topics = true;
+    else
+      options->sync_topics = false;
+  }
 
 	rosbag_player->changeOptions(*options);
 }
