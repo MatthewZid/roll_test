@@ -227,8 +227,12 @@ void Player::publish() {
     //Categorize messages
     std::set<std::string> msg_set;
 
-    for(rosbag::MessageInstance m : view)
+    for(rosbag::MessageInstance m : view){
         msg_set.insert(m.getTopic());
+
+        //copy MessageInsances to vector
+        all_msgs.push_back(m);
+    }
 
     int msg_type_num = msg_set.size();
 
@@ -302,12 +306,22 @@ void Player::publish() {
             	doPublish(m);
         }*/
 
-        // Call do-publish for each message (with iterator)
+        /*// Call do-publish for each message (with iterator)
         for(auto it = view.begin(); it != view.end(); it++) {
             if (!node_handle_.ok() or terminate_)
                 break;
 
             doPublish(*it);
+        }*/
+
+        // Call do-publish for each message (with custom vector)
+        for(auto it = all_msgs.begin(); it != all_msgs.end(); it++) {
+            if (!node_handle_.ok() or terminate_)
+                break;
+
+            //ROS_WARN("\nTopic: %s\nTime: %lf\n", it->getTopic().c_str(), it->getTime().toSec());
+            it -= doPublish(*it);
+            //ros::Duration(1).sleep();
         }
 
         /*//Call doPublish for master topic
@@ -317,6 +331,9 @@ void Player::publish() {
 
             doPublish(*it);
         }*/
+
+        //clear info for restart if loop
+        time_publisher_.clearInfo();
 
         if (options_.keep_alive)
             while (node_handle_.ok())
@@ -338,6 +355,7 @@ void Player::publish() {
                 it->clear();
 
             msg_vec_.clear();
+            all_msgs.clear();
 
             for(boost::shared_ptr<rosbag::Bag> bag : bags_)
         		bag->close();
@@ -624,7 +642,7 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                     (pub_iter->second).publish(m);
 
                     //keep time info
-                    time_publisher_.insertPassedTime(time_publisher_.getTime(), horizon, m, callerid_topic);
+                    time_publisher_.insertPassedTime(m.getTime(), horizon, m, callerid_topic);
 
                     if(options_.sync_topics)
                         syncTopics(m);
@@ -645,27 +663,31 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                 break;
             case 'b':
                 if (paused_) {
-                   	time_publisher_.backstepClock();
+                    if(time_publisher_.removeAndCheckEmpty()){
+                        ROS_WARN("Back to start! Terminating...\n");
+                        terminate_ = true;
+                        options_.loop = false;
+                    }
+                    else{
+                       	time_publisher_.backstepClock();
 
-                    ros::WallDuration shift = ros::WallTime::now() - time_publisher_.getPrevWC() ;
-                    paused_time_ = ros::WallTime::now();
+                        ros::WallDuration shift = ros::WallTime::now() - time_publisher_.getPrevWC() ;
+                        paused_time_ = ros::WallTime::now();
 
-                    time_translator_.shiftBack(ros::Duration(shift.sec, shift.nsec));
+                        time_translator_.shiftBack(ros::Duration(shift.sec, shift.nsec));
 
-                    horizon -= shift;
-                    time_publisher_.setWCHorizon(horizon);
-                    
-                    std::vector<rosbag::MessageInstance>& mv = time_publisher_.getMsgVec();
+                        //horizon -= shift;
+                        horizon = time_publisher_.getPrevWC() - shift;
+                        time_publisher_.setWCHorizon(horizon);
+                        
+                        std::vector<rosbag::MessageInstance>& mv = time_publisher_.getMsgVec();
 
-                    std::string const& prevcid = time_publisher_.getPrevCallerId();
-                    std::map<std::string, ros::Publisher>::iterator prev_pub_iter = publishers_.find(prevcid);
-                    ROS_ASSERT(prev_pub_iter != publishers_.end());
+                        std::string const& prevcid = time_publisher_.getPrevCallerId();
+                        std::map<std::string, ros::Publisher>::iterator prev_pub_iter = publishers_.find(prevcid);
+                        ROS_ASSERT(prev_pub_iter != publishers_.end());
 
-                    // Update subscribers.
-                    ros::spinOnce();
-
-                    if(!time_publisher_.checkEmpty()){
-                        mv.pop_back();
+                        // Update subscribers.
+                        ros::spinOnce();
 
                         (prev_pub_iter->second).publish(mv.back()); //publish previous message
 
@@ -674,11 +696,6 @@ int Player::doPublish(rosbag::MessageInstance const& m)
 
                         //mv.pop_back();
                     }
-                    else{
-                        ROS_WARN("Back to start! Terminating...\n");
-                        terminate_ = true;
-                        options_.loop = false;
-                    }
 
                     printTime();
 
@@ -686,7 +703,7 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                     choice_ = '-';
                     lock_choice_.unlock();
 
-                    return 1;
+                    return 2;
                 }
 
                 lock_choice_.lock();
@@ -730,11 +747,12 @@ int Player::doPublish(rosbag::MessageInstance const& m)
         printTime();
         time_publisher_.runClock(ros::WallDuration(.1));
 
-        //keep time info
-        time_publisher_.insertPassedTime(time_publisher_.getTime(), horizon, m, callerid_topic);
-
         ros::spinOnce();
     }
+
+    //keep time info
+    //time_publisher_.insertPassedTime(time_publisher_.getTime(), horizon, m, callerid_topic);
+    time_publisher_.insertPassedTime(m.getTime(), horizon, m, callerid_topic);
 
     pub_iter->second.publish(m);
 
@@ -817,8 +835,16 @@ void TimePublisher::insertPassedTime(ros::Time const& t, ros::WallTime const& wt
     passed_pubs_.push_back(cid);
 }
 
-bool TimePublisher::checkEmpty()
+bool TimePublisher::removeAndCheckEmpty()
 {
+    if(passed_time_.empty() and passed_walltime_.empty() and passed_msg_.empty() and passed_pubs_.empty())
+        return true;
+
+    passed_time_.pop_back();
+    passed_walltime_.pop_back();
+    passed_msg_.pop_back();
+    passed_pubs_.pop_back();
+
     if(passed_time_.empty() or passed_walltime_.empty() or passed_msg_.empty() or passed_pubs_.empty())
         return true;
     else
@@ -869,18 +895,12 @@ ros::Time const& TimePublisher::getTime() const
 
 ros::WallTime TimePublisher::getPrevWC()
 {
-    ros::WallTime pt = passed_walltime_.back();
-    passed_walltime_.pop_back();
-
-    return pt;
+    return passed_walltime_.back();
 }
 
 std::string TimePublisher::getPrevCallerId()
 {
-    std::string cid = passed_pubs_.back();
-    passed_pubs_.pop_back();
-
-    return cid;
+    return passed_pubs_.back();
 }
 
 void TimePublisher::runClock(const ros::WallDuration& duration)
@@ -980,7 +1000,6 @@ void TimePublisher::backstepClock()
     }
     else {
         current_ = passed_time_.back();
-        passed_time_.pop_back();
     }
 }
 

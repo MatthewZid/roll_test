@@ -114,7 +114,7 @@ public:
     ros::WallTime getPrevWC();
     std::string getPrevCallerId();
     std::vector<rosbag::MessageInstance>& getMsgVec(){ return passed_msg_; };
-    bool checkEmpty();
+    bool removeAndCheckEmpty();
     void clearInfo();
 
     void setPublishFrequency(double publish_frequency);
@@ -244,6 +244,9 @@ private:
 
     //terminate loop in pause
     bool terminate_;
+
+    //vector with all messages
+    std::vector<rosbag::MessageInstance> all_msgs;
 
     std::vector< std::vector<rosbag::MessageInstance> > msg_vec_;
 
