@@ -53,6 +53,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   bag_files_.push_back("2018-02-14-14-07-54.bag");
   bag_files_.push_back("2018-06-26-15-20-58.bag");
   bag_files_.push_back("ss2_lsN_sc1A_ru08_cg_v.bag");
+  bag_files_.push_back("2018-07-17-15-58-25.bag");
 
   //initialize rosbag player
   options = new rviz_rosbag::PlayerOptions;
@@ -74,6 +75,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   bagmenu->insertItem(1, QString((bag_files_[0] + " (Still)").c_str()));
   bagmenu->insertItem(2, QString((bag_files_[1] + " (Still)").c_str()));
   bagmenu->insertItem(3, QString((bag_files_[3]).c_str()));
+  bagmenu->insertItem(4, QString((bag_files_[4] + " (8eiko)").c_str()));
   bagmenu->setEditable(false);
   bag_layout->addWidget(label);
   bag_layout->addWidget(bagmenu);
@@ -185,6 +187,8 @@ void RvizCntrlPanel::bagSelect(const int index)
     bagfile = BAGPATH + bag_files_[1];
   else if(index == 3)
     bagfile = BAGPATH + bag_files_[3];
+  else if(index == 4)
+    bagfile = BAGPATH + bag_files_[4];
 
   options->bags.push_back(bagfile);
   rosbag_player->changeOptions(*options);
