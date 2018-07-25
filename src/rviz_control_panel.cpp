@@ -12,6 +12,7 @@ QPushButton* cancel_loop_button;
 QCheckBox* loop_checkbox;
 QCheckBox* quiet_checkbox;
 QCheckBox* sync_topics_checkbox;
+QCheckBox* clock_checkbox;
 
 rviz_rosbag::Player* rosbag_player;
 
@@ -60,6 +61,10 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   std::string bagfile = BAGPATH + bag_files_[2];
   (options->bags).push_back(bagfile);
 
+  //default player options
+  options->queue_size = 100;
+  options->bag_time_frequency = 100.0f;
+
   rosbag_player = new rviz_rosbag::Player(*options);
 
   // Next we lay out the "output topic" text entry field using a
@@ -106,9 +111,11 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   loop_checkbox = new QCheckBox("Loop");
   quiet_checkbox = new QCheckBox("Quiet");
   sync_topics_checkbox = new QCheckBox("Sync Topics");
+  clock_checkbox = new QCheckBox("Clock");
   check_boxes->addWidget(loop_checkbox);
   check_boxes->addWidget(quiet_checkbox);
   check_boxes->addWidget(sync_topics_checkbox);
+  check_boxes->addWidget(clock_checkbox);
 
   // Then create the control widget.
   //q_widget_ = new RvizQWidget;
@@ -157,6 +164,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   connect(loop_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
   connect(quiet_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
   connect(sync_topics_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
+  connect(clock_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
   //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
   //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
   //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
@@ -200,6 +208,7 @@ void RvizCntrlPanel::enableStartBtn()
 
   loop_checkbox->setEnabled(true);
   quiet_checkbox->setEnabled(true);
+  clock_checkbox->setEnabled(true);
   bagmenu->setEnabled(true);
   step_button->setEnabled(false);
   backstep_button->setEnabled(false);
@@ -224,6 +233,7 @@ void RvizCntrlPanel::handleButton()
 
     loop_checkbox->setEnabled(false);
     quiet_checkbox->setEnabled(false);
+    clock_checkbox->setEnabled(false);
 
     if(loop_checkbox->isChecked()){
       options->loop = true;
@@ -300,6 +310,13 @@ void RvizCntrlPanel::handleCheckBox()
       options->sync_topics = true;
     else
       options->sync_topics = false;
+  }
+  else if(checkbox_name == "Cloc&k")
+  {
+  	if(clock_checkbox->checkState() == Qt::Checked)
+      options->bag_time = true;
+    else
+      options->bag_time = false;
   }
 
 	rosbag_player->changeOptions(*options);
