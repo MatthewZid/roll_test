@@ -290,8 +290,6 @@ void Player::publish() {
         else
             time_publisher_.setPublishFrequency(-1.0);
 
-        ROS_WARN("Yeah\n");
-
         paused_time_ = now_wt;
 
         //Always start with cleared choice
@@ -837,7 +835,7 @@ void TimePublisher::insertPassedTime(ros::Time const& t, ros::WallTime const& wt
     passed_pubs_.push_back(cid);
 
     if(do_publish_)
-    	prev_pub_.push_back(next_pub_);
+    	prev_now_.push_back(ros::WallTime::now());
 }
 
 bool TimePublisher::removeAndCheckEmpty()
@@ -851,7 +849,7 @@ bool TimePublisher::removeAndCheckEmpty()
     passed_pubs_.pop_back();
 
     if(do_publish_)
-    	prev_pub_.pop_back();
+    	prev_now_.pop_back();
 
     if(passed_time_.empty() or passed_walltime_.empty() or passed_msg_.empty() or passed_pubs_.empty())
         return true;
@@ -865,7 +863,7 @@ void TimePublisher::clearInfo()
 	passed_walltime_.clear();
 	passed_msg_.clear();
 	passed_pubs_.clear();
-	prev_pub_.clear();
+	prev_now_.clear();
 }
 
 void TimePublisher::setPublishFrequency(double publish_frequency)
@@ -1006,7 +1004,7 @@ void TimePublisher::backstepClock()
 
         //ros::WallTime t = ros::WallTime::now();
         //next_pub_ = t - wall_step_;
-        next_pub_ = prev_pub_.back();
+        next_pub_ = prev_now_.back() + wall_step_;
     }
     else {
         current_ = passed_time_.back();

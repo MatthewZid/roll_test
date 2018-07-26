@@ -172,7 +172,7 @@ private:
     std::vector<ros::WallTime> passed_walltime_;
     std::vector<rosbag::MessageInstance> passed_msg_;
     std::vector<std::string> passed_pubs_;
-    std::vector<ros::WallTime> prev_pub_;
+    std::vector<ros::WallTime> prev_now_;
 };
 
 class ROSBAG_DECL Player
