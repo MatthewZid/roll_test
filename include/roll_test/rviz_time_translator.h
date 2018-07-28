@@ -49,13 +49,19 @@ public:
     void      setRealStartTime(ros::Time const& t);
     void      setTranslatedStartTime(ros::Time const& t);
     void      shift(ros::Duration const& d);  
-    void 	  shiftBack(ros::Duration const& d);             
+    void 	  shiftBack(ros::Time const& pts, ros::Duration const& d);             
     ros::Time translate(ros::Time const& t);
+
+    void insertPassedTrStart();
+    ros::Time getPrevTrStart(){ return passed_tr_start_.back(); };
+    bool removeAndCheckEmpty();
 
 private:
     double    time_scale_;
     ros::Time real_start_;
     ros::Time translated_start_;
+
+    std::vector<ros::Time> passed_tr_start_;
 };
 
 } // namespace rosbag

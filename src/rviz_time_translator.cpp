@@ -57,12 +57,30 @@ void TimeTranslator::shift(ros::Duration const& d) {
     translated_start_ += d;
 }
 
-void TimeTranslator::shiftBack(ros::Duration const& d) {
-    translated_start_ -= d;
+void TimeTranslator::shiftBack(ros::Time const& pts, ros::Duration const& d) {
+    translated_start_ = pts + d;
 }
 
 ros::Time TimeTranslator::translate(ros::Time const& t) {
     return translated_start_ + (t - real_start_) * (1.0 / time_scale_);
+}
+
+void TimeTranslator::insertPassedTrStart()
+{
+	passed_tr_start_.push_back(translated_start_);
+}
+
+bool TimeTranslator::removeAndCheckEmpty()
+{
+	if(passed_tr_start_.empty())
+		return true;
+
+	passed_tr_start_.pop_back();
+
+	if(passed_tr_start_.empty())
+		return true;
+	else
+		return false;
 }
 
 } // namespace rosbag
