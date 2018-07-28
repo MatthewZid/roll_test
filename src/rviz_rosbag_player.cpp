@@ -643,6 +643,7 @@ int Player::doPublish(rosbag::MessageInstance const& m)
 
                     //keep time info
                     time_publisher_.insertPassedTime(m.getTime(), horizon, m, callerid_topic);
+                    time_translator_.insertPassedTrStart();
 
                     if(options_.sync_topics)
                         syncTopics(m);
@@ -663,7 +664,7 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                 break;
             case 'b':
                 if (paused_) {
-                    if(time_publisher_.removeAndCheckEmpty()){
+                    if(time_publisher_.removeAndCheckEmpty() and time_translator_.removeAndCheckEmpty()){
                         ROS_WARN("Back to start! Terminating...\n");
                         terminate_ = true;
                         options_.loop = false;
@@ -674,10 +675,11 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                         ros::WallDuration shift = ros::WallTime::now() - time_publisher_.getPrevWC() ;
                         paused_time_ = ros::WallTime::now();
 
-                        time_translator_.shiftBack(ros::Duration(shift.sec, shift.nsec));
+                        ros::Time const& prev_tr_start = time_translator_.getPrevTrStart();
+                        time_translator_.shiftBack(prev_tr_start, ros::Duration(shift.sec, shift.nsec));
 
                         //horizon -= shift;
-                        horizon = time_publisher_.getPrevWC() - shift;
+                        horizon = time_publisher_.getPrevWC() + shift;
                         time_publisher_.setWCHorizon(horizon);
                         
                         std::vector<rosbag::MessageInstance>& mv = time_publisher_.getMsgVec();
@@ -753,6 +755,7 @@ int Player::doPublish(rosbag::MessageInstance const& m)
     //keep time info
     //time_publisher_.insertPassedTime(time_publisher_.getTime(), horizon, m, callerid_topic);
     time_publisher_.insertPassedTime(m.getTime(), horizon, m, callerid_topic);
+    time_translator_.insertPassedTrStart();
 
     pub_iter->second.publish(m);
 
@@ -1002,9 +1005,9 @@ void TimePublisher::backstepClock()
         pub_msg.clock = current_;
         time_pub_.publish(pub_msg);
 
-        //ros::WallTime t = ros::WallTime::now();
-        //next_pub_ = t - wall_step_;
-        next_pub_ = prev_now_.back() + wall_step_;
+        ros::WallTime t = ros::WallTime::now();
+        next_pub_ = t + wall_step_;
+        //next_pub_ = prev_now_.back() + wall_step_;
     }
     else {
         current_ = passed_time_.back();
