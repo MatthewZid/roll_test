@@ -319,6 +319,9 @@ void Player::publish() {
             if (!node_handle_.ok() or terminate_)
                 break;
 
+            if(it < all_msgs.begin())
+                it = all_msgs.begin();
+
             //ROS_WARN("\nTopic: %s\nTime: %lf\n", it->getTopic().c_str(), it->getTime().toSec());
             it -= doPublish(*it);
             //ros::Duration(1).sleep();
@@ -334,6 +337,7 @@ void Player::publish() {
 
         //clear info for restart if loop
         time_publisher_.clearInfo();
+        time_translator_.clearInfo();
 
         if (options_.keep_alive)
             while (node_handle_.ok())
@@ -350,6 +354,7 @@ void Player::publish() {
             	std::cout << std::endl << "Terminated.\n" << std::endl;
 
             time_publisher_.clearInfo();
+            time_translator_.clearInfo();
 
             for(auto it = msg_vec_.begin(); it != msg_vec_.end(); it++)
                 it->clear();
@@ -556,6 +561,11 @@ int Player::doPublish(rosbag::MessageInstance const& m)
     if (options_.at_once) {
         time_publisher_.stepClock();
         pub_iter->second.publish(m);
+
+        //keep time info
+        time_publisher_.insertPassedTime(m.getTime(), horizon, m, callerid_topic);
+        time_translator_.insertPassedTrStart();
+
         printTime();
         return 0;
     }
@@ -570,6 +580,11 @@ int Player::doPublish(rosbag::MessageInstance const& m)
       horizon += shift;
       time_publisher_.setWCHorizon(horizon);
       (pub_iter->second).publish(m);
+
+      //keep time info
+      time_publisher_.insertPassedTime(m.getTime(), horizon, m, callerid_topic);
+      time_translator_.insertPassedTrStart();
+
       printTime();
       return 0;
     }
@@ -613,8 +628,11 @@ int Player::doPublish(rosbag::MessageInstance const& m)
 
 //////////// For automated backstep selection after one Pause button click ////////////
 
-            /*if(paused_)
-            	choice_ = 'b';*/
+            /*if(paused_){
+                lock_choice_.lock();
+            	choice_ = 'b';
+                lock_choice_.unlock();
+            }*/
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -664,10 +682,12 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                 break;
             case 'b':
                 if (paused_) {
-                    if(time_publisher_.removeAndCheckEmpty() and time_translator_.removeAndCheckEmpty()){
-                        ROS_WARN("Back to start! Terminating...\n");
-                        terminate_ = true;
-                        options_.loop = false;
+                    if(time_publisher_.removeAndCheckEmpty() or time_translator_.removeAndCheckEmpty()){
+                        ROS_WARN("Back to start!\n");
+                        //terminate_ = true;
+                        //options_.loop = false;
+                        time_publisher_.clearInfo();
+                        time_translator_.clearInfo();
                     }
                     else{
                        	time_publisher_.backstepClock();
@@ -682,7 +702,7 @@ int Player::doPublish(rosbag::MessageInstance const& m)
                         horizon = time_publisher_.getPrevWC() + shift;
                         time_publisher_.setWCHorizon(horizon);
                         
-                        std::vector<rosbag::MessageInstance>& mv = time_publisher_.getMsgVec();
+                        std::vector<rosbag::MessageInstance> const& mv = time_publisher_.getMsgVec();
 
                         std::string const& prevcid = time_publisher_.getPrevCallerId();
                         std::map<std::string, ros::Publisher>::iterator prev_pub_iter = publishers_.find(prevcid);
@@ -836,9 +856,6 @@ void TimePublisher::insertPassedTime(ros::Time const& t, ros::WallTime const& wt
     passed_walltime_.push_back(wt);
     passed_msg_.push_back(m);
     passed_pubs_.push_back(cid);
-
-    if(do_publish_)
-    	prev_now_.push_back(ros::WallTime::now());
 }
 
 bool TimePublisher::removeAndCheckEmpty()
@@ -851,10 +868,7 @@ bool TimePublisher::removeAndCheckEmpty()
     passed_msg_.pop_back();
     passed_pubs_.pop_back();
 
-    if(do_publish_)
-    	prev_now_.pop_back();
-
-    if(passed_time_.empty() or passed_walltime_.empty() or passed_msg_.empty() or passed_pubs_.empty())
+    if(passed_time_.empty() and passed_walltime_.empty() and passed_msg_.empty() and passed_pubs_.empty())
         return true;
     else
         return false;
@@ -866,7 +880,6 @@ void TimePublisher::clearInfo()
 	passed_walltime_.clear();
 	passed_msg_.clear();
 	passed_pubs_.clear();
-	prev_now_.clear();
 }
 
 void TimePublisher::setPublishFrequency(double publish_frequency)
@@ -1007,7 +1020,6 @@ void TimePublisher::backstepClock()
 
         ros::WallTime t = ros::WallTime::now();
         next_pub_ = t + wall_step_;
-        //next_pub_ = prev_now_.back() + wall_step_;
     }
     else {
         current_ = passed_time_.back();
