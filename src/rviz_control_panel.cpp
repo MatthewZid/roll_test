@@ -97,6 +97,8 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   player_layout->setSpacing(0);
   step_button = new QPushButton(">>");
   backstep_button = new QPushButton("<<");
+  step_button->setAutoRepeat(true); //repeat action while holding down
+  backstep_button->setAutoRepeat(true); //repeat action while holding down
   step_button->setEnabled(false);
   backstep_button->setEnabled(false);
   player_layout->addWidget(backstep_button);
@@ -156,8 +158,8 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
   connect(pause_button, SIGNAL(released()), this, SLOT(handleButton()));
-  connect(step_button, SIGNAL(released()), this, SLOT(handleButton()));
-  connect(backstep_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(step_button, SIGNAL(pressed()), this, SLOT(handleButton()));
+  connect(backstep_button, SIGNAL(pressed()), this, SLOT(handleButton()));
 
   connect(cancel_loop_button, SIGNAL(released()), this, SLOT(handleButton()));
 
