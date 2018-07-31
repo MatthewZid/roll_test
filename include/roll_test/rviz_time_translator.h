@@ -55,6 +55,8 @@ public:
     void insertPassedTrStart();
     ros::Time getPrevTrStart(){ return passed_tr_start_.back(); };
     bool removeAndCheckEmpty();
+    void clearInfo();
+    long trSize(){ return passed_tr_start_.size(); };
 
 private:
     double    time_scale_;

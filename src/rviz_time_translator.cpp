@@ -83,4 +83,9 @@ bool TimeTranslator::removeAndCheckEmpty()
 		return false;
 }
 
+void TimeTranslator::clearInfo()
+{
+	passed_tr_start_.clear();
+}
+
 } // namespace rosbag
