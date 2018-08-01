@@ -49,16 +49,37 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   , linear_velocity_( 0 )
   , angular_velocity_( 0 )
 {
-  //input bag files
-  bag_files_.push_back("2018-02-14-14-01-08.bag");
-  bag_files_.push_back("2018-02-14-14-07-54.bag");
-  bag_files_.push_back("2018-06-26-15-20-58.bag");
-  bag_files_.push_back("ss2_lsN_sc1A_ru08_cg_v.bag");
-  bag_files_.push_back("2018-07-17-15-58-25.bag");
+  //locate bagfiles from directory
+  fs::path bp(BAGPATH);
+  int dcount = 0;
+
+  try
+  {
+    ROS_ASSERT(fs::exists(bp));
+    ROS_ASSERT(fs::is_directory(bp));
+
+    for(fs::directory_iterator dit(bp); dit != fs::directory_iterator(); dit++)
+      if(is_regular_file(*dit) and dit->path().has_extension())
+        if(dit->path().extension().string() == ".bag"){
+          bag_files_.push_back(dit->path().filename().string());
+          dcount++;
+        }
+  }
+  catch(const fs::filesystem_error& ex){
+    std::cout << ex.what() << std::endl;
+  }
+
+  if(dcount == 0)
+  {
+    ROS_FATAL("No bag files found!\n");
+    ros::shutdown();
+  }
+
+  ROS_INFO("\nFound %d bag files\n", dcount);
 
   //initialize rosbag player
   options = new rviz_rosbag::PlayerOptions;
-  std::string bagfile = BAGPATH + bag_files_[2];
+  std::string bagfile = BAGPATH + bag_files_[0];
   (options->bags).push_back(bagfile);
 
   //default player options
@@ -76,11 +97,10 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   bagmenu = new QComboBox;
   label->setText("Bag file:");
   label->setAlignment(Qt::AlignLeft);
-  bagmenu->insertItem(0, QString((bag_files_[2] + " (Moving)").c_str()));
-  bagmenu->insertItem(1, QString((bag_files_[0] + " (Still)").c_str()));
-  bagmenu->insertItem(2, QString((bag_files_[1] + " (Still)").c_str()));
-  bagmenu->insertItem(3, QString((bag_files_[3]).c_str()));
-  bagmenu->insertItem(4, QString((bag_files_[4] + " (8eiko)").c_str()));
+
+  for(int i = 0; i < dcount; i++)
+    bagmenu->insertItem(i, QString(bag_files_[i].c_str()));
+
   bagmenu->setEditable(false);
   bag_layout->addWidget(label);
   bag_layout->addWidget(bagmenu);
@@ -189,16 +209,7 @@ void RvizCntrlPanel::bagSelect(const int index)
   std::string bagfile;
   options->bags.clear();
 
-  if(index == 0)
-    bagfile = BAGPATH + bag_files_[2];
-  else if(index == 1)
-    bagfile = BAGPATH + bag_files_[0];
-  else if(index == 2)
-    bagfile = BAGPATH + bag_files_[1];
-  else if(index == 3)
-    bagfile = BAGPATH + bag_files_[3];
-  else if(index == 4)
-    bagfile = BAGPATH + bag_files_[4];
+  bagfile = BAGPATH + bag_files_[index];
 
   options->bags.push_back(bagfile);
   rosbag_player->changeOptions(*options);

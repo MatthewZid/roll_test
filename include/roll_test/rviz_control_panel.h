@@ -31,7 +31,11 @@
 
 #include <geometry_msgs/Twist.h>
 #include <roll_test/rviz_rosbag_player.h>
+
+#include <boost/filesystem.hpp>
 #endif
+
+namespace fs = boost::filesystem;
 
 namespace rviz_rosbag
 {
