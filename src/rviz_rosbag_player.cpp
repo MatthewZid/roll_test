@@ -126,8 +126,12 @@ void Player::publish() {
         }
     }
 
-    if (!node_handle_.ok())
+    if (!node_handle_.ok()){
+      for(boost::shared_ptr<rosbag::Bag> bag : bags_)
+        bag->close();
+
       return;
+    }
 
     if (!options_.prefix.empty())
     {
