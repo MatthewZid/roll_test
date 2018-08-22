@@ -6,6 +6,7 @@ QPushButton* start_button;
 QPushButton* pause_button;
 QPushButton* step_button;
 QPushButton* backstep_button;
+QPushButton* filediag_button;
 
 QPushButton* cancel_loop_button;
 
@@ -49,37 +50,14 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   , linear_velocity_( 0 )
   , angular_velocity_( 0 )
 {
-  //locate bagfiles from directory
-  fs::path bp(BAGPATH);
-  int dcount = 0;
+  //default bagfile directory
+  bag_path = "/home/mzidianakis/Ros_WS/bagfiles";
 
-  try
-  {
-    ROS_ASSERT(fs::exists(bp));
-    ROS_ASSERT(fs::is_directory(bp));
-
-    for(fs::directory_iterator dit(bp); dit != fs::directory_iterator(); dit++)
-      if(is_regular_file(*dit) and dit->path().has_extension())
-        if(dit->path().extension().string() == ".bag"){
-          bag_files_.push_back(dit->path().filename().string());
-          dcount++;
-        }
-  }
-  catch(const fs::filesystem_error& ex){
-    std::cout << ex.what() << std::endl;
-  }
-
-  if(dcount == 0)
-  {
-    ROS_FATAL("No bag files found!\n");
-    ros::shutdown();
-  }
-
-  ROS_INFO("\nFound %d bag files\n", dcount);
+  bagpath_file_count = findBagfiles();
 
   //initialize rosbag player
   options = new rviz_rosbag::PlayerOptions;
-  std::string bagfile = BAGPATH + bag_files_[0];
+  std::string bagfile = bag_path.toStdString() + "/" + bag_files_[0];
   (options->bags).push_back(bagfile);
 
   //default player options
@@ -92,13 +70,23 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   // QLabel and a QLineEdit in a QHBoxLayout.
   QGroupBox* rosbag_group = new QGroupBox("Rosbag player");
 
+  QHBoxLayout* filediag_layout = new QHBoxLayout;
+  QLabel* path_lbl = new QLabel("Bag path:");
+  filediag_button = new QPushButton("...");
+  current_bagpath = new QLineEdit;
+  current_bagpath->setText(bag_path);
+  current_bagpath->setReadOnly(true);
+  filediag_layout->addWidget(path_lbl);
+  filediag_layout->addWidget(current_bagpath);
+  filediag_layout->addWidget(filediag_button);
+
   QHBoxLayout* bag_layout = new QHBoxLayout;
   QLabel* label = new QLabel;
   bagmenu = new QComboBox;
   label->setText("Bag file:");
   label->setAlignment(Qt::AlignLeft);
 
-  for(int i = 0; i < dcount; i++)
+  for(int i = 0; i < bagpath_file_count; i++)
     bagmenu->insertItem(i, QString(bag_files_[i].c_str()));
 
   bagmenu->setEditable(false);
@@ -145,6 +133,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   // Lay out the topic field above the control widget.
   QVBoxLayout* rosbag_layout = new QVBoxLayout;
   rosbag_layout->setSpacing(VSPACING);
+  rosbag_layout->addLayout(filediag_layout);
   rosbag_layout->addLayout(bag_layout);
   rosbag_layout->addLayout( buttons_layout );
   rosbag_layout->addLayout(player_layout);
@@ -174,6 +163,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   //connect(bagmenu, QOverload<int>::of(&QComboBox::activated), [=](int index){bagSelect(index);});
   qRegisterMetaType< QVector<int> >("QVector<int>");  //fixes QVector<int> error in conncet
   connect(bagmenu, SIGNAL(activated(int)), this, SLOT(bagSelect(const int)));
+  connect(filediag_button, SIGNAL(released()), this, SLOT(handleButton()));
 
   connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
@@ -209,7 +199,7 @@ void RvizCntrlPanel::bagSelect(const int index)
   std::string bagfile;
   options->bags.clear();
 
-  bagfile = BAGPATH + bag_files_[index];
+  bagfile = bag_path.toStdString() + "/" + bag_files_[index];
 
   options->bags.push_back(bagfile);
   rosbag_player->changeOptions(*options);
@@ -228,6 +218,9 @@ void RvizCntrlPanel::enableStartBtn()
   cancel_loop_button->setEnabled(false);
   pause_button->setText("Pause");
   pause_button->setEnabled(false);
+
+  current_bagpath->setEnabled(true);
+  filediag_button->setEnabled(true);
 }
 
 void RvizCntrlPanel::handleButton()
@@ -247,6 +240,9 @@ void RvizCntrlPanel::handleButton()
     loop_checkbox->setEnabled(false);
     quiet_checkbox->setEnabled(false);
     clock_checkbox->setEnabled(false);
+
+    current_bagpath->setEnabled(false);
+    filediag_button->setEnabled(false);
 
     if(loop_checkbox->isChecked()){
       options->loop = true;
@@ -285,16 +281,38 @@ void RvizCntrlPanel::handleButton()
     rosbag_player->setChoice('b');
     (rosbag_player->lock_choice_).unlock();
   }
+  else if(button_name == "...")
+  {
+    bag_path = QFileDialog::getExistingDirectory(this, "Open bagfile directory", "/home/mzidianakis", QFileDialog::ShowDirsOnly
+                                                                                                | QFileDialog::DontResolveSymlinks
+                                                                                                | QFileDialog::DontUseNativeDialog);
+    if(bag_path == "")
+      bag_path = current_bagpath->text();
+
+    if(bag_path != current_bagpath->text())
+    {
+      bag_files_.clear();
+      bagmenu->clear();
+
+      bagpath_file_count = findBagfiles();
+
+      for(int i = 0; i < bagpath_file_count; i++)
+        bagmenu->insertItem(i, QString(bag_files_[i].c_str()));
+
+      current_bagpath->setText(bag_path);
+    }
+  }
   else if(button_name == "Term&inate")
   {
     //Terminate loop
-    options->loop = false;
-    rosbag_player->changeOptions(*options);
-    rosbag_player->setTerminate(true);
     pause_button->setEnabled(false);
     step_button->setEnabled(false);
     backstep_button->setEnabled(false);
     cancel_loop_button->setEnabled(false);
+    
+    options->loop = false;
+    rosbag_player->changeOptions(*options);
+    rosbag_player->setTerminate(true);
   }
 }
 
@@ -333,6 +351,39 @@ void RvizCntrlPanel::handleCheckBox()
   }
 
 	rosbag_player->changeOptions(*options);
+}
+
+int RvizCntrlPanel::findBagfiles()
+{
+  //locate bagfiles from directory
+  fs::path bp(bag_path.toStdString());
+  int dcount = 0;
+
+  try
+  {
+    ROS_ASSERT(fs::exists(bp));
+    ROS_ASSERT(fs::is_directory(bp));
+
+    for(fs::directory_iterator dit(bp); dit != fs::directory_iterator(); dit++)
+      if(is_regular_file(*dit) and dit->path().has_extension())
+        if(dit->path().extension().string() == ".bag"){
+          bag_files_.push_back(dit->path().filename().string());
+          dcount++;
+        }
+  }
+  catch(const fs::filesystem_error& ex){
+    std::cout << ex.what() << std::endl;
+  }
+
+  if(dcount == 0)
+  {
+    ROS_FATAL("No bag files found!\n");
+    ros::shutdown();
+  }
+
+  ROS_INFO("\nFound %d bag files\n", dcount);
+
+  return dcount;
 }
 
 // setVel() is connected to the DriveWidget's output, which is sent
@@ -378,7 +429,7 @@ void RvizCntrlPanel::load( const rviz::Config& config )
   QString topic;
   if( config.mapGetString( "Topic", &topic ))
   {
-    rosbag_player_input_->setText( topic );
+    //rosbag_player_input_->setText( topic );
     //updateChoice();
   }
 }

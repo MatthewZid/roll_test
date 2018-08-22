@@ -25,6 +25,7 @@
 #include <QGroupBox>
 #include <QApplication>
 #include <QCheckBox>
+#include <QFileDialog>
 
 #include <mutex>
 #include <thread>
@@ -101,13 +102,13 @@ private Q_SLOTS:
   void enableStartBtn();
   void handleCheckBox();
 
-//private:
-  //void bagSelect(int index);
+private:
+  int findBagfiles();
 
   // Then we finish up with protected member variables.
 protected:
   // One-line text editor for entering the outgoing ROS topic name.
-  QLineEdit* rosbag_player_input_;
+  QLineEdit* current_bagpath;
 
   // The current name of the output topic.
   QString output_topic_;
@@ -119,6 +120,8 @@ protected:
   ros::NodeHandle nh_;
 
   std::vector<std::string> bag_files_;
+  int bagpath_file_count;
+  QString bag_path;
 
   rviz_rosbag::PlayerOptions* options;
 
