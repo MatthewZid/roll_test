@@ -243,7 +243,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				QModelIndex child_index = model->index(i, 0);
 				rviz::Property *child = model->getProp(child_index);
 				//ROS_WARN("Num ch: %d\n", child->numChildren());
-				//ROS_INFO("Name %d: %s\n", i, (child->getNameStd()).c_str());
+				ROS_INFO("Name %d: %s\n", i, (child->getNameStd()).c_str());
 
 				rviz::VectorProperty *vec_child = (rviz::VectorProperty*) child->childAt(0);
 				Ogre::Vector3 pc_vec = vec_child->getVector();
@@ -253,7 +253,17 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				Ogre::ColourValue pc_colour = color_child->getOgreColor();
 
 				//ROS_INFO("Color of %d: %f, %f, %f\n", i, pc_colour.r, pc_colour.g, pc_colour.b);
-				ROS_INFO("\nTool: Pos: %f, %f, %f\n", pc_vec.x, pc_vec.y, pc_vec.z);
+				ROS_INFO("\nPos: %f, %f, %f\n", pc_vec.x, pc_vec.y, pc_vec.z);
+
+				//get point id from name
+				std::string point_name;
+				int point_id;
+				std::istringstream iss(child->getNameStd());
+
+				iss >> point_name >> point_id;
+				
+				//find point_id in pointcloud clusters
+				
 			}
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////

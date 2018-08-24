@@ -31,6 +31,8 @@
 #include <rviz/properties/property.h>
 #include <rviz/properties/property_tree_model.h>
 
+#include <pointcloud_msgs/PointCloud2_Segments.h>
+
 #include <cstdlib>
 #endif
 
