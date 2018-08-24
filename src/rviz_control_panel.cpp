@@ -236,6 +236,7 @@ void RvizCntrlPanel::handleButton()
     pause_button->setEnabled(true);
     step_button->setEnabled(true);
     backstep_button->setEnabled(true);
+    cancel_loop_button->setEnabled(true);
 
     loop_checkbox->setEnabled(false);
     quiet_checkbox->setEnabled(false);
@@ -247,7 +248,6 @@ void RvizCntrlPanel::handleButton()
     if(loop_checkbox->isChecked()){
       options->loop = true;
       rosbag_player->changeOptions(*options);
-      cancel_loop_button->setEnabled(true);
     }
 
     QApplication::processEvents();
@@ -300,6 +300,12 @@ void RvizCntrlPanel::handleButton()
         bagmenu->insertItem(i, QString(bag_files_[i].c_str()));
 
       current_bagpath->setText(bag_path);
+
+      options->bags.clear();
+      std::string bagfile = bag_path.toStdString() + "/" + bag_files_[0];
+
+      options->bags.push_back(bagfile);
+      rosbag_player->changeOptions(*options);
     }
   }
   else if(button_name == "Term&inate")
