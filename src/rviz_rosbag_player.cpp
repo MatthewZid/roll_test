@@ -299,9 +299,6 @@ void Player::publish() {
         //Always start with cleared choice
         choice_ = '-';
 
-        //Don't start terminated
-        terminate_ = false;
-
         /*// Call do-publish for each message (ORIGINAL)
         for(rosbag::MessageInstance m : view) {
             if (!node_handle_.ok() or terminate_)
@@ -356,6 +353,9 @@ void Player::publish() {
             	std::cout << std::endl << "Done.\n" << std::endl;
             else
             	std::cout << std::endl << "Terminated.\n" << std::endl;
+
+            //Don't start terminated
+            terminate_ = false;
 
             time_publisher_.clearInfo();
             time_translator_.clearInfo();
