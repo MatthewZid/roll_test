@@ -781,6 +781,15 @@ int Player::doPublish(rosbag::MessageInstance const& m)
     time_publisher_.insertPassedTime(m.getTime(), horizon, m, callerid_topic);
     time_translator_.insertPassedTrStart();
 
+/////////////////// Copy this to signal handler!!! /////////////////////
+
+/*if(m.isType<sensor_msgs::LaserScan>()){
+    boost::shared_ptr<sensor_msgs::LaserScan> kourada = m.instantiate<sensor_msgs::LaserScan>();
+    ROS_INFO("%lf\n", kourada->ranges[0]);
+}*/
+
+/////////////////// Copy this to signal handler!!! /////////////////////
+
     pub_iter->second.publish(m);
 
     return 0;
