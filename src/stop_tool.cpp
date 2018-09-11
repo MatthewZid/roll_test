@@ -1,4 +1,18 @@
 #include <roll_test/stop_tool.h>
+#include <ros/ros.h>
+#include <pointcloud_msgs/PointCloud2_Segments.h>
+
+ros::Subscriber pointsub;
+bool received = false;
+pointcloud_msgs::PointCloud2_Segments cluster_msg;
+
+void pointCallback(const pointcloud_msgs::PointCloud2_Segments& msg)
+{
+    ROS_WARN("Stop tool: Message received\n");
+
+    received = true;
+    cluster_msg = msg;
+}
 
 namespace roll_test
 {
@@ -67,6 +81,11 @@ void StopTool::onInitialize()
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
   }*/
+    ros::NodeHandle nh;
+    std::string input_topic;
+    nh.param("pointcloud2_segments_viz/input_topic",input_topic, std::string("/new_pcl"));
+
+    pointsub = nh.subscribe(input_topic, 1, pointCallback);
 }
 
 void StopTool::activate()
@@ -265,6 +284,11 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				//find point_id in pointcloud clusters
 				
 			}
+
+            if(received)
+            {
+
+            }
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
