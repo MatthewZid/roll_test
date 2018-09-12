@@ -3,14 +3,12 @@
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 
 ros::Subscriber pointsub;
-bool received = false;
 pointcloud_msgs::PointCloud2_Segments cluster_msg;
 
 void pointCallback(const pointcloud_msgs::PointCloud2_Segments& msg)
 {
     ROS_WARN("Stop tool: Message received\n");
 
-    received = true;
     cluster_msg = msg;
 }
 
@@ -281,14 +279,9 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 
 				iss >> point_name >> point_id;
 				
-				//find point_id in pointcloud clusters
+				//find cluster id of the selected point
 				
 			}
-
-            if(received)
-            {
-
-            }
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
