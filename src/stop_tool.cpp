@@ -1,5 +1,6 @@
 #include <roll_test/stop_tool.h>
 #include <ros/ros.h>
+#include <pcl_ros/point_cloud.h>
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 
 ros::Subscriber pointsub;
@@ -98,7 +99,7 @@ void StopTool::activate()
   }*/
   
 
-  context_->getSelectionManager()->setTextureSize(512);
+  //context_->getSelectionManager()->setTextureSize(512);
   selecting_ = false;
 
   //start rosbag player in parallel
@@ -255,12 +256,15 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			rviz::PropertyTreeModel *model = sel_manager->getPropertyModel();
 			int num_points = model->rowCount();
 
+			std::vector< std::pair<int,size_t> > found_clusters;
+			int found_point_cntr = 0;
+
 			for(int i=0; i < num_points; i++)
 			{
 				QModelIndex child_index = model->index(i, 0);
 				rviz::Property *child = model->getProp(child_index);
 				//ROS_WARN("Num ch: %d\n", child->numChildren());
-				ROS_INFO("Name %d: %s\n", i, (child->getNameStd()).c_str());
+				//ROS_INFO("Name %d: %s\n", i, (child->getNameStd()).c_str());
 
 				rviz::VectorProperty *vec_child = (rviz::VectorProperty*) child->childAt(0);
 				Ogre::Vector3 pc_vec = vec_child->getVector();
@@ -270,7 +274,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				Ogre::ColourValue pc_colour = color_child->getOgreColor();
 
 				//ROS_INFO("Color of %d: %f, %f, %f\n", i, pc_colour.r, pc_colour.g, pc_colour.b);
-				ROS_INFO("\nPos: %f, %f, %f\n", pc_vec.x, pc_vec.y, pc_vec.z);
+				//ROS_INFO("\nPos: %f, %f, %f\n", pc_vec.x, pc_vec.y, pc_vec.z);
 
 				//get point id from name
 				std::string point_name;
@@ -280,8 +284,35 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				iss >> point_name >> point_id;
 				
 				//find cluster id of the selected point
-				
+				bool found_point = false;
+
+				for(size_t j=0; j < cluster_msg.clusters.size(); j++){
+					pcl::PCLPointCloud2 cloud2;
+        			pcl_conversions::toPCL( cluster_msg.clusters[j] , cloud2);
+
+        			pcl::PointCloud<pcl::PointXYZ> cloud;
+        			pcl::fromPCLPointCloud2(cloud2, cloud);
+
+        			size_t found_cloud_pos;
+
+					for(size_t k=0; k < cloud.points.size(); k++)
+						if(pc_vec.x == cloud.points[k].x and pc_vec.y == cloud.points[k].y and pc_vec.z == cloud.points[k].z)
+						{
+							found_point = true;
+							found_cloud_pos = k;
+							break;
+						}
+
+					if(found_point){
+						found_clusters.push_back(std::pair<int,size_t>(cluster_msg.cluster_id[j], found_cloud_pos));
+						found_point_cntr++;
+						break;
+					}
+				}
 			}
+
+			if(found_point_cntr < num_points)
+				ROS_WARN("Missing cloud points!\n");
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
