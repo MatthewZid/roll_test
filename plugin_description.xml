@@ -1,9 +1,16 @@
 <library path="lib/libroll_test">
-  <class name="roll_test/Custom-Control-Panel"
+  <class name="roll_test/RosbagPlayer"
          type="roll_test::RvizCntrlPanel"
          base_class_type="rviz::Panel">
     <description>
-      A panel widget allowing rosbag player control and Point Cloud management.
+      A panel widget allowing rosbag player control.
+    </description>
+  </class>
+  <class name="roll_test/Annotation"
+         type="roll_test::AnnotationPanel"
+         base_class_type="rviz::Panel">
+    <description>
+      A panel widget allowing Point Cloud annotation.
     </description>
   </class>
   <class name="roll_test/StopSign"
