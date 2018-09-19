@@ -13,7 +13,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QRadioButton>
+#include <QPushButton>
+#include <QGroupBox>
 #endif
 
 class QLineEdit;
@@ -46,41 +47,22 @@ public:
   // Now we declare overrides of rviz::Panel functions for saving and
   // loading data from the config file.  Here the data is the
   // topic name.
-  virtual void load( const rviz::Config& config );
-  virtual void save( rviz::Config config ) const;
+  // virtual void load( const rviz::Config& config );
+  // virtual void save( rviz::Config config ) const;
 
   // Next come a couple of public Qt slots.
 public Q_SLOTS:
-  // The control area, DriveWidget, sends its output to a Qt signal
-  // for ease of re-use, so here we declare a Qt slot to receive it.
-  void setVel( float linear_velocity_, float angular_velocity_ );
+  void handleTxtChanged();
 
-  // In this example setTopic() does not get connected to any signal
-  // (it is called directly), but it is easy to define it as a public
-  // slot instead of a private function in case it would be useful to
-  // some other user.
-  void setTopic( const QString& topic );
-
-  // Here we declare some internal slots.
-protected Q_SLOTS:
-  // sendvel() publishes the current velocity values to a ROS
-  // topic.  Internally this is connected to a timer which calls it 10
-  // times per second.
-  void sendVel();
-
-  // updateTopic() reads the topic name from the QLineEdit and calls
-  // setTopic() with the result.
-  void updateTopic();
+  void buttonAction();
 
   // Then we finish up with protected member variables.
 protected:
-  QRadioButton cluster_id_btn;
-
-  // One-line text editor for entering the outgoing ROS topic name.
-  QLineEdit* output_topic_editor_;
-
-  // The current name of the output topic.
-  QString output_topic_;
+  QVBoxLayout* cluster_id_layout;
+  QPushButton *merge_id_btn;
+  QPushButton *cluster_name_btn;
+  QLineEdit* id_state_show;
+  QLineEdit* cluster_name_edit;
 
   // The ROS publisher for the command velocity.
   ros::Publisher velocity_publisher_;

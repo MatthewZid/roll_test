@@ -17,103 +17,71 @@ namespace roll_test
 // publishing.
 AnnotationPanel::AnnotationPanel( QWidget* parent )
   : rviz::Panel( parent )
-  , linear_velocity_( 0 )
-  , angular_velocity_( 0 )
 {
-  // Next we lay out the "output topic" text entry field using a
-  // QLabel and a QLineEdit in a QHBoxLayout.
-  QHBoxLayout* topic_layout = new QHBoxLayout;
-  topic_layout->addWidget( new QLabel( "Output Topic:" ));
-  output_topic_editor_ = new QLineEdit;
-  topic_layout->addWidget( output_topic_editor_ );
+  QHBoxLayout* id_state_layout = new QHBoxLayout;
+  id_state_layout->addWidget(new QLabel("Selection id state:"));
+  id_state_show = new QLineEdit;
+  id_state_show->setText("");
+  id_state_show->setPlaceholderText("No received state");
+  id_state_show->setFrame(false);
+  id_state_show->setReadOnly(true);
+  id_state_layout->addWidget(id_state_show);
 
-  // Lay out the topic field above the control widget.
-  QVBoxLayout* layout = new QVBoxLayout;
-  layout->addLayout( topic_layout );
-  setLayout( layout );
+  cluster_id_layout = new QVBoxLayout;
+  cluster_id_layout->addLayout(id_state_layout);
+  merge_id_btn = new QPushButton("Merge");
+  merge_id_btn->setVisible(false);
+  cluster_id_layout->addWidget(merge_id_btn);
 
-  QHBoxLayout* radiobtn_layout = new QHBoxLayout;
-  cluster_id_btn->setText("Cluster id");
-  radiobtn_layout->addWidget(cluster_id_btn);
+  QHBoxLayout* cluster_name_layout = new QHBoxLayout;
+  cluster_name_layout->addWidget(new QLabel("Name selected cluster:"));
+  cluster_name_edit = new QLineEdit;
+  cluster_name_edit->setPlaceholderText("Enter name");
+  cluster_name_edit->setEnabled(false);
+  cluster_name_layout->addWidget(cluster_name_edit);
+  cluster_name_btn = new QPushButton("Name cluster");
+  cluster_name_layout->addWidget(cluster_name_btn);
+  cluster_name_btn->setEnabled(false);
+
+  QGroupBox* cluster_id_group = new QGroupBox("Cluster id");
+  cluster_id_group->setLayout(cluster_id_layout);
+
+  QGroupBox* cluster_name_group = new QGroupBox("Cluster name");
+  cluster_name_group->setLayout(cluster_name_layout);
+
+  QVBoxLayout* main_layout = new QVBoxLayout;
+  main_layout->addWidget(cluster_id_group);
+  main_layout->addWidget(cluster_name_group);
+
+  setLayout(main_layout);
 
   // Next we make signal/slot connections.
-  connect( drive_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
-  connect( output_topic_editor_, SIGNAL( editingFinished() ), this, SLOT( updateTopic() ));
+  connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
+  connect(merge_id_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
+  connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
 }
 
-// setVel() is connected to the DriveWidget's output, which is sent
-// whenever it changes due to a mouse event.  This just records the
-// values it is given.  The data doesn't actually get sent until the
-// next timer callback.
-void AnnotationPanel::setVel( float lin, float ang )
+void AnnotationPanel::handleTxtChanged()
 {
-  linear_velocity_ = lin;
-  angular_velocity_ = ang;
-}
-
-// Read the topic name from the QLineEdit and call setTopic() with the
-// results.  This is connected to QLineEdit::editingFinished() which
-// fires when the user presses Enter or Tab or otherwise moves focus
-// away.
-void AnnotationPanel::updateTopic()
-{
-  setTopic( output_topic_editor_->text() );
-}
-
-// Set the topic name we are publishing to.
-void AnnotationPanel::setTopic( const QString& new_topic )
-{
-  // Only take action if the name has changed.
-  if( new_topic != output_topic_ )
-  {
-    output_topic_ = new_topic;
-    // If the topic is the empty string, don't publish anything.
-    if( output_topic_ == "" )
-    {
-      velocity_publisher_.shutdown();
-    }
+  if(id_state_show->text().toStdString() == "")
+    merge_id_btn->setVisible(false);
+  else{
+    if(id_state_show->text().toStdString() == "Clean cluster")
+      merge_id_btn->setVisible(false);
     else
-    {
-      // The old ``velocity_publisher_`` is destroyed by this assignment,
-      // and thus the old topic advertisement is removed.  The call to
-      // nh_advertise() says we want to publish data on the new topic
-      // name.
-      velocity_publisher_ = nh_.advertise<geometry_msgs::Twist>( output_topic_.toStdString(), 1 );
-    }
-    // rviz::Panel defines the configChanged() signal.  Emitting it
-    // tells RViz that something in this panel has changed that will
-    // affect a saved config file.  Ultimately this signal can cause
-    // QWidget::setWindowModified(true) to be called on the top-level
-    // rviz::VisualizationFrame, which causes a little asterisk ("*")
-    // to show in the window's title bar indicating unsaved changes.
-    Q_EMIT configChanged();
+      merge_id_btn->setVisible(true);
   }
-
-  // Gray out the control widget when the output topic is empty.
-  drive_widget_->setEnabled( output_topic_ != "" );
 }
 
-// Publish the control velocities if ROS is not shutting down and the
-// publisher is ready with a valid topic name.
-void AnnotationPanel::sendVel()
+void AnnotationPanel::buttonAction()
 {
-  if( ros::ok() && velocity_publisher_ )
-  {
-    geometry_msgs::Twist msg;
-    msg.linear.x = linear_velocity_;
-    msg.linear.y = 0;
-    msg.linear.z = 0;
-    msg.angular.x = 0;
-    msg.angular.y = 0;
-    msg.angular.z = angular_velocity_;
-    velocity_publisher_.publish( msg );
-  }
+
 }
 
 // Save all configuration data from this panel to the given
 // Config object.  It is important here that you call save()
 // on the parent class so the class id and panel name get saved.
-void AnnotationPanel::save( rviz::Config config ) const
+/*void AnnotationPanel::save( rviz::Config config ) const
 {
   rviz::Panel::save( config );
   config.mapSetValue( "Topic", output_topic_ );
@@ -129,7 +97,7 @@ void AnnotationPanel::load( const rviz::Config& config )
     output_topic_editor_->setText( topic );
     updateTopic();
   }
-}
+}*/
 
 } // end namespace rviz_plugin_tutorials
 
@@ -137,4 +105,4 @@ void AnnotationPanel::load( const rviz::Config& config )
 // loadable by pluginlib::ClassLoader must have these two lines
 // compiled in its .cpp file, outside of any namespace scope.
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(rviz_plugin_tutorials::AnnotationPanel,rviz::Panel )
+PLUGINLIB_EXPORT_CLASS(roll_test::AnnotationPanel,rviz::Panel )
