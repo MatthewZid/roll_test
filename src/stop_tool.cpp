@@ -1,9 +1,11 @@
 #include <roll_test/stop_tool.h>
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
+#include <std_msgs/String.h>
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 
 ros::Subscriber pointsub;
+ros::Publisher selection_pub;
 pointcloud_msgs::PointCloud2_Segments cluster_msg;
 
 void pointCallback(const pointcloud_msgs::PointCloud2_Segments& msg)
@@ -85,6 +87,8 @@ void StopTool::onInitialize()
     nh.param("pointcloud2_segments_viz/input_topic",input_topic, std::string("/new_pcl"));
 
     pointsub = nh.subscribe(input_topic, 1, pointCallback);
+    selection_pub = nh.advertise<std_msgs::String>("selection_topic", 1);
+
 }
 
 void StopTool::activate()
@@ -99,7 +103,7 @@ void StopTool::activate()
   }*/
   
 
-  //context_->getSelectionManager()->setTextureSize(512);
+  context_->getSelectionManager()->setTextureSize(512);
   selecting_ = false;
 
   //start rosbag player in parallel
@@ -230,6 +234,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 
 			//actual selection (defined by type)
 			rviz::SelectionManager::SelectType type = rviz::SelectionManager::Replace;
+			rviz::M_Picked selection;
 
 			if(event.shift())
 				type = rviz::SelectionManager::Add;
@@ -256,7 +261,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			rviz::PropertyTreeModel *model = sel_manager->getPropertyModel();
 			int num_points = model->rowCount();
 
-			std::vector< std::pair<int,size_t> > found_clusters;
+			std::vector<int> found_clusters;
 			int found_point_cntr = 0;
 
 			for(int i=0; i < num_points; i++)
@@ -304,7 +309,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 						}
 
 					if(found_point){
-						found_clusters.push_back(std::pair<int,size_t>(cluster_msg.cluster_id[j], found_cloud_pos));
+						found_clusters.push_back(cluster_msg.cluster_id[j]);
 						found_point_cntr++;
 						break;
 					}
@@ -313,6 +318,31 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 
 			if(found_point_cntr < num_points)
 				ROS_WARN("Missing cloud points!\n");
+
+			//find different id's
+			auto it_begin = found_clusters.begin();
+			int current_id = *it_begin;
+			it_begin++;
+			bool isDifferent = false;
+
+			for(auto it = it_begin; it != found_clusters.end(); it++)
+			{
+				if(*it != current_id){
+					isDifferent = true;
+					break;
+				}
+			}
+
+			//publish state - all id's identical: clean cluster, different id's: dirty cluster
+			std_msgs::String state_msg;
+
+			if(isDifferent)
+				state_msg.data = "Dirty cluster!";
+			else
+				state_msg.data = "Clean cluster";
+ROS_WARN("Sending\n");
+			selection_pub.publish(state_msg);
+			ros::spinOnce();
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
