@@ -1,5 +1,13 @@
 #include <roll_test/rviz_annotation_panel.h>
 
+QLineEdit* id_state_show;
+
+void selectionCallback(const std_msgs::String& msg)
+{
+  id_state_show->setText(QString(msg.data.c_str()));
+  ROS_WARN("Received\n");
+}
+
 namespace roll_test
 {
 
@@ -18,6 +26,7 @@ namespace roll_test
 AnnotationPanel::AnnotationPanel( QWidget* parent )
   : rviz::Panel( parent )
 {
+  //Set GUI
   QHBoxLayout* id_state_layout = new QHBoxLayout;
   id_state_layout->addWidget(new QLabel("Selection id state:"));
   id_state_show = new QLineEdit;
@@ -54,6 +63,9 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   main_layout->addWidget(cluster_name_group);
 
   setLayout(main_layout);
+
+  //ROS handling setup
+  selection_sub = nh.subscribe("selection_topic", 1, selectionCallback);
 
   // Next we make signal/slot connections.
   connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));

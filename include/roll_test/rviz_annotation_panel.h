@@ -3,6 +3,7 @@
 
 #ifndef Q_MOC_RUN
 # include <ros/ros.h>
+#include <std_msgs/String.h>
 
 # include <rviz/panel.h>
 
@@ -61,14 +62,11 @@ protected:
   QVBoxLayout* cluster_id_layout;
   QPushButton *merge_id_btn;
   QPushButton *cluster_name_btn;
-  QLineEdit* id_state_show;
   QLineEdit* cluster_name_edit;
 
-  // The ROS publisher for the command velocity.
-  ros::Publisher velocity_publisher_;
-
   // The ROS node handle.
-  ros::NodeHandle nh_;
+  ros::NodeHandle nh;
+  ros::Subscriber selection_sub;
   // END_TUTORIAL
 };
 
