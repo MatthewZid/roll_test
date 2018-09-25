@@ -5,7 +5,6 @@ QLineEdit* id_state_show;
 void selectionCallback(const std_msgs::String& msg)
 {
   id_state_show->setText(QString(msg.data.c_str()));
-  ROS_WARN("Received\n");
 }
 
 namespace roll_test
@@ -75,19 +74,38 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
 
 void AnnotationPanel::handleTxtChanged()
 {
-  if(id_state_show->text().toStdString() == "")
+  if(id_state_show->text().toStdString() == ""){
     merge_id_btn->setVisible(false);
+    cluster_name_edit->setEnabled(false);
+    cluster_name_btn->setEnabled(false);
+  }
   else{
-    if(id_state_show->text().toStdString() == "Clean cluster")
+    if(id_state_show->text().toStdString() == "Clean cluster"){
       merge_id_btn->setVisible(false);
-    else
+      cluster_name_edit->setEnabled(true);
+      cluster_name_btn->setEnabled(true);
+    }
+    else{
       merge_id_btn->setVisible(true);
+      cluster_name_edit->setEnabled(false);
+      cluster_name_btn->setEnabled(false);
+    }
   }
 }
 
 void AnnotationPanel::buttonAction()
 {
+	QPushButton* buttonSender = qobject_cast<QPushButton*>(QObject::sender());
+ 	std::string button_name = buttonSender->text().toStdString();
 
+ 	if(button_name == "Mer&ge")
+ 	{
+ 		
+ 	}
+ 	else if(button_name == "&Name cluster")
+ 	{
+ 		
+ 	}
 }
 
 // Save all configuration data from this panel to the given
