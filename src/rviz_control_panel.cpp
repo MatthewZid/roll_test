@@ -51,7 +51,8 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   , angular_velocity_( 0 )
 {
   //default bagfile directory
-  bag_path = "/home/mzidianakis/Ros_WS/bagfiles";
+  std::string homepath = std::getenv("HOME");
+  bag_path = QString::fromStdString(homepath) + "/Ros_WS/bagfiles";
 
   bagpath_file_count = findBagfiles();
 
@@ -283,7 +284,9 @@ void RvizCntrlPanel::handleButton()
   }
   else if(button_name == "...")
   {
-    bag_path = QFileDialog::getExistingDirectory(this, "Open bagfile directory", "/home/mzidianakis", QFileDialog::ShowDirsOnly
+    std::string homepath = std::getenv("HOME");
+    QString qHomepath = QString::fromStdString(homepath);
+    bag_path = QFileDialog::getExistingDirectory(this, "Open bagfile directory", qHomepath, QFileDialog::ShowDirsOnly
                                                                                                 | QFileDialog::DontResolveSymlinks
                                                                                                 | QFileDialog::DontUseNativeDialog);
     if(bag_path == "")
