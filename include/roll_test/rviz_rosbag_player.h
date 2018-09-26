@@ -51,6 +51,8 @@
 #include <boost/format.hpp>
 #include <mutex>
 
+#include <roll_test/RosbagMsgInfo.h>
+
 #define SECURE_OFFSET 10.0
 
 namespace rosbag
@@ -255,6 +257,8 @@ private:
 
     //psoitions of closest time frame to master topic
     std::vector<int> closest_pos_;
+
+    ros::Publisher msg_info_pub;
 
     //initial secure value of min_dist(minimum distance between master topic and candidate topic)
     double max_time_dist_;

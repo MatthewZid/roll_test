@@ -99,6 +99,9 @@ Player::Player(PlayerOptions const& options) :
 {
   ros::NodeHandle private_node_handle("~");
   pause_service_ = private_node_handle.advertiseService("pause_playback", &Player::pauseCallback, this);
+
+  ros::NodeHandle nh;
+  msg_info_pub = nh.advertise<roll_test::RosbagMsgInfo>("rosbag_msg_info_topic", 1);
 }
 
 Player::~Player() {
@@ -791,6 +794,15 @@ int Player::doPublish(rosbag::MessageInstance const& m)
 }*/
 
 /////////////////// Copy this to signal handler!!! /////////////////////
+
+    //publish msg info
+    roll_test::RosbagMsgInfo minfo;
+
+    minfo.msg_type.data = m.getDataType();
+    minfo.msg_topic.data = m.getTopic();
+    minfo.msg_callerid.data = m.getCallerId();
+    minfo.stamp = m.getTime();
+    msg_info_pub.publish(minfo);
 
     pub_iter->second.publish(m);
 
