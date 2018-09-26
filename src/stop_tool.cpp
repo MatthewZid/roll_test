@@ -2,6 +2,8 @@
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <std_msgs/String.h>
+#include <geometry_msgs/Point.h>
+#include <roll_test/PointSelection.h>
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 
 ros::Subscriber pointsub;
@@ -87,8 +89,7 @@ void StopTool::onInitialize()
     nh.param("pointcloud2_segments_viz/input_topic",input_topic, std::string("/new_pcl"));
 
     pointsub = nh.subscribe(input_topic, 1, pointCallback);
-    selection_pub = nh.advertise<std_msgs::String>("selection_topic", 1);
-
+    selection_pub = nh.advertise<roll_test::PointSelection>("selection_topic", 1);
 }
 
 void StopTool::activate()
@@ -263,6 +264,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 
 			std::vector<int> found_clusters;
 			int found_point_cntr = 0;
+			roll_test::PointSelection found_points;
 
 			for(int i=0; i < num_points; i++)
 			{
@@ -298,13 +300,17 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
         			pcl::PointCloud<pcl::PointXYZ> cloud;
         			pcl::fromPCLPointCloud2(cloud2, cloud);
 
-        			size_t found_cloud_pos;
-
 					for(size_t k=0; k < cloud.points.size(); k++)
 						if(pc_vec.x == cloud.points[k].x and pc_vec.y == cloud.points[k].y and pc_vec.z == cloud.points[k].z)
 						{
+							geometry_msgs::Point pt;
+
 							found_point = true;
-							found_cloud_pos = k;
+
+							pt.x = cloud.points[k].x;
+							pt.y = cloud.points[k].y;
+							pt.z = cloud.points[k].z;
+							found_points.points.push_back(pt);
 							break;
 						}
 
@@ -343,7 +349,9 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				else
 					state_msg.data = "Clean cluster";
 
-				selection_pub.publish(state_msg);
+				found_points.state_msg = state_msg;
+
+				selection_pub.publish(found_points);
 				ros::spinOnce();
 			}
 			else
