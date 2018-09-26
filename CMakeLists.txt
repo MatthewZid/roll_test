@@ -9,6 +9,7 @@ project(roll_test)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  std_msgs
   geometry_msgs
   sensor_msgs
   message_generation
@@ -44,12 +45,15 @@ add_definitions(-DQT_NO_KEYWORDS)
  add_message_files(
    FILES
    Pos.msg
+   PointSelection.msg
+   RosbagMsgInfo.msg
  )
 
 
 ## Generate added messages and services with any dependencies listed here
  generate_messages(
    DEPENDENCIES
+   std_msgs
    geometry_msgs  # Or other packages containing msgs
  )
 
