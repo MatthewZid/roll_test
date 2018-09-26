@@ -3,7 +3,9 @@
 
 #ifndef Q_MOC_RUN
 # include <ros/ros.h>
-#include <std_msgs/String.h>
+#include <geometry_msgs/Point.h>
+#include <roll_test/PointSelection.h>
+#include <roll_test/RosbagMsgInfo.h>
 
 # include <rviz/panel.h>
 
@@ -16,6 +18,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QGroupBox>
+
+#include <fstream>
 #endif
 
 class QLineEdit;
@@ -59,14 +63,13 @@ public Q_SLOTS:
 
   // Then we finish up with protected member variables.
 protected:
-  QVBoxLayout* cluster_id_layout;
-  QPushButton *merge_id_btn;
   QPushButton *cluster_name_btn;
   QLineEdit* cluster_name_edit;
 
   // The ROS node handle.
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
+  ros::Subscriber rosbag_info_sub;
   // END_TUTORIAL
 };
 

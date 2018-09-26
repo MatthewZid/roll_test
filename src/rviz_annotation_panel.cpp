@@ -1,10 +1,26 @@
 #include <roll_test/rviz_annotation_panel.h>
 
 QLineEdit* id_state_show;
+std::vector<geometry_msgs::Point> selected_points;
 
-void selectionCallback(const std_msgs::String& msg)
+ros::Time msg_time;
+std::string msg_type;
+std::string msg_topic;
+std::string msg_callerid;
+
+void selectionCallback(const roll_test::PointSelection& msg)
 {
-  id_state_show->setText(QString(msg.data.c_str()));
+  selected_points = msg.points;
+  id_state_show->setText(QString(msg.state_msg.data.c_str()));
+  ROS_WARN("Received selected points\n");
+}
+
+void rosbagCallback(const roll_test::RosbagMsgInfo& msg)
+{
+  msg_time = msg.stamp;
+  msg_type = msg.msg_type.data;
+  msg_topic = msg.msg_topic.data;
+  msg_callerid = msg.msg_callerid.data;
 }
 
 namespace roll_test
@@ -35,12 +51,6 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   id_state_show->setReadOnly(true);
   id_state_layout->addWidget(id_state_show);
 
-  cluster_id_layout = new QVBoxLayout;
-  cluster_id_layout->addLayout(id_state_layout);
-  merge_id_btn = new QPushButton("Merge");
-  merge_id_btn->setVisible(false);
-  cluster_id_layout->addWidget(merge_id_btn);
-
   QHBoxLayout* cluster_name_layout = new QHBoxLayout;
   cluster_name_layout->addWidget(new QLabel("Name selected cluster:"));
   cluster_name_edit = new QLineEdit;
@@ -51,10 +61,10 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   cluster_name_layout->addWidget(cluster_name_btn);
   cluster_name_btn->setEnabled(false);
 
-  QGroupBox* cluster_id_group = new QGroupBox("Cluster id");
-  cluster_id_group->setLayout(cluster_id_layout);
+  QGroupBox* cluster_id_group = new QGroupBox("Cluster state");
+  cluster_id_group->setLayout(id_state_layout);
 
-  QGroupBox* cluster_name_group = new QGroupBox("Cluster name");
+  QGroupBox* cluster_name_group = new QGroupBox("Cluster class name");
   cluster_name_group->setLayout(cluster_name_layout);
 
   QVBoxLayout* main_layout = new QVBoxLayout;
@@ -65,47 +75,61 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
 
   //ROS handling setup
   selection_sub = nh.subscribe("selection_topic", 1, selectionCallback);
+  rosbag_info_sub = nh.subscribe("rosbag_msg_info_topic", 1, rosbagCallback);
 
   // Next we make signal/slot connections.
   connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
-  connect(merge_id_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
   connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
 }
 
 void AnnotationPanel::handleTxtChanged()
 {
   if(id_state_show->text().toStdString() == ""){
-    merge_id_btn->setVisible(false);
     cluster_name_edit->setEnabled(false);
     cluster_name_btn->setEnabled(false);
   }
   else{
-    if(id_state_show->text().toStdString() == "Clean cluster"){
-      merge_id_btn->setVisible(false);
-      cluster_name_edit->setEnabled(true);
-      cluster_name_btn->setEnabled(true);
-    }
-    else{
-      merge_id_btn->setVisible(true);
-      cluster_name_edit->setEnabled(false);
-      cluster_name_btn->setEnabled(false);
-    }
+    cluster_name_edit->setEnabled(true);
+    cluster_name_btn->setEnabled(true);
+
+    if(id_state_show->text().toStdString() != "Clean cluster")
+      ROS_WARN("Annotation panel: Multiple id's detected in selection.\nIf points belong to different objects, they need manual re-clustering\n");
   }
 }
 
 void AnnotationPanel::buttonAction()
 {
-	QPushButton* buttonSender = qobject_cast<QPushButton*>(QObject::sender());
- 	std::string button_name = buttonSender->text().toStdString();
+  std::string homepath = std::getenv("HOME");
+  std::string filename = "annotation.csv";
+  std::string csv_path = homepath + "/Ros_WS/" + filename;
 
- 	if(button_name == "Mer&ge")
- 	{
- 		
- 	}
- 	else if(button_name == "&Name cluster")
- 	{
- 		
- 	}
+  std::ofstream csvfile;
+  csvfile.open(csv_path, std::ios::out | std::ios::app);
+
+  if(!csvfile.is_open())
+  {
+    ROS_FATAL("%s could not be opened!\n", filename.c_str());
+    ros::shutdown();
+  }
+
+  //write out annotation
+  csvfile << cluster_name_edit->text().toStdString() << "," << msg_time << "," << msg_topic << "," << msg_callerid << "," << msg_type;
+  csvfile << ",[";
+
+  bool first_time = true;
+  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
+  {
+    if(first_time)
+      first_time = false;
+    else
+      csvfile << ",";
+    
+    csvfile << it->x << "," << it->y << "," << it->z;
+  }
+
+  csvfile << "]" << std::endl;
+
+  csvfile.close();
 }
 
 // Save all configuration data from this panel to the given
