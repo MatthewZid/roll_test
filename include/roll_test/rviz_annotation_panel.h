@@ -5,7 +5,6 @@
 # include <ros/ros.h>
 #include <geometry_msgs/Point.h>
 #include <roll_test/PointSelection.h>
-#include <roll_test/RosbagMsgInfo.h>
 
 # include <rviz/panel.h>
 
@@ -69,7 +68,6 @@ protected:
   // The ROS node handle.
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
-  ros::Subscriber rosbag_info_sub;
   // END_TUTORIAL
 };
 

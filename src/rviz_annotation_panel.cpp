@@ -3,24 +3,11 @@
 QLineEdit* id_state_show;
 std::vector<geometry_msgs::Point> selected_points;
 
-ros::Time msg_time;
-std::string msg_type;
-std::string msg_topic;
-std::string msg_callerid;
-
 void selectionCallback(const roll_test::PointSelection& msg)
 {
   selected_points = msg.points;
   id_state_show->setText(QString(msg.state_msg.data.c_str()));
   ROS_WARN("Received selected points\n");
-}
-
-void rosbagCallback(const roll_test::RosbagMsgInfo& msg)
-{
-  msg_time = msg.stamp;
-  msg_type = msg.msg_type.data;
-  msg_topic = msg.msg_topic.data;
-  msg_callerid = msg.msg_callerid.data;
 }
 
 namespace roll_test
@@ -75,7 +62,6 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
 
   //ROS handling setup
   selection_sub = nh.subscribe("selection_topic", 1, selectionCallback);
-  rosbag_info_sub = nh.subscribe("rosbag_msg_info_topic", 1, rosbagCallback);
 
   // Next we make signal/slot connections.
   connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
@@ -113,7 +99,7 @@ void AnnotationPanel::buttonAction()
   }
 
   //write out annotation
-  csvfile << cluster_name_edit->text().toStdString() << "," << msg_time << "," << msg_topic << "," << msg_callerid << "," << msg_type;
+  //csvfile << cluster_name_edit->text().toStdString() << "," << msg_time << "," << msg_topic << "," << msg_callerid << "," << msg_type;
   csvfile << ",[";
 
   bool first_time = true;
