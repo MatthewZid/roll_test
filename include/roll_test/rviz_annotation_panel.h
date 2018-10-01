@@ -4,6 +4,7 @@
 #ifndef Q_MOC_RUN
 # include <ros/ros.h>
 #include <geometry_msgs/Point.h>
+#include <std_msgs/String.h>
 #include <roll_test/PointSelection.h>
 
 # include <rviz/panel.h>
@@ -17,6 +18,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QGroupBox>
+#include <QComboBox>
 
 #include <fstream>
 #endif
@@ -48,6 +50,8 @@ public:
   // widget as they normally would with Qt.
   AnnotationPanel( QWidget* parent = 0 );
 
+  virtual void onInitialize();
+
   // Now we declare overrides of rviz::Panel functions for saving and
   // loading data from the config file.  Here the data is the
   // topic name.
@@ -60,14 +64,18 @@ public Q_SLOTS:
 
   void buttonAction();
 
+  void topicSelect(const QString& txt);
+
   // Then we finish up with protected member variables.
 protected:
   QPushButton *cluster_name_btn;
   QLineEdit* cluster_name_edit;
+  QComboBox* cluster_topic_list;
 
   // The ROS node handle.
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
+  ros::Publisher topic_pub;
   // END_TUTORIAL
 };
 

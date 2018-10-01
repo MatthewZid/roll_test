@@ -48,11 +48,21 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   cluster_name_layout->addWidget(cluster_name_btn);
   cluster_name_btn->setEnabled(false);
 
+  QHBoxLayout* topic_list_layout = new QHBoxLayout;
+  topic_list_layout->addWidget(new QLabel("Topic list:"));
+  cluster_topic_list = new QComboBox;
+  cluster_topic_list->setEditable(true);
+  topic_list_layout->addWidget(cluster_topic_list);
+
+  QVBoxLayout* cluster_name_main_layout = new QVBoxLayout;
+  cluster_name_main_layout->addLayout(cluster_name_layout);
+  cluster_name_main_layout->addLayout(topic_list_layout);
+
   QGroupBox* cluster_id_group = new QGroupBox("Cluster state");
   cluster_id_group->setLayout(id_state_layout);
 
   QGroupBox* cluster_name_group = new QGroupBox("Cluster class name");
-  cluster_name_group->setLayout(cluster_name_layout);
+  cluster_name_group->setLayout(cluster_name_main_layout);
 
   QVBoxLayout* main_layout = new QVBoxLayout;
   main_layout->addWidget(cluster_id_group);
@@ -60,12 +70,51 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
 
   setLayout(main_layout);
 
-  //ROS handling setup
-  selection_sub = nh.subscribe("selection_topic", 1, selectionCallback);
-
   // Next we make signal/slot connections.
   connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
   connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
+  connect(cluster_topic_list, SIGNAL(currentIndexChanged(const QString&)), this, SLOT(topicSelect(const QString&)));
+}
+
+void AnnotationPanel::onInitialize()
+{
+	//ROS handling setup
+  	selection_sub = nh.subscribe("selection_topic", 1, selectionCallback);
+  	topic_pub = nh.advertise<std_msgs::String>("roll_test/publishing_topic", 1);
+
+	int topic_index = 0;
+	ros::master::V_TopicInfo master_topics;
+	ros::master::getTopics(master_topics);
+
+	for(auto it = master_topics.begin(); it != master_topics.end(); it++)
+	{
+		const ros::master::TopicInfo& info = *it;
+
+		if(info.datatype.find("PointCloud2") != std::string::npos)
+			cluster_topic_list->insertItem(topic_index++, QString(info.name.c_str()));
+	}
+
+	if(cluster_topic_list->count() > 0){
+		cluster_topic_list->setCurrentIndex(0);
+
+		std_msgs::String topic_for_subscribing;
+		topic_for_subscribing.data = cluster_topic_list->currentText().toStdString();
+
+		ROS_INFO("Publishing main topic: %s\n", topic_for_subscribing.data.c_str());
+		while(topic_pub.getNumSubscribers() == 0)
+			ros::spinOnce();
+
+		topic_pub.publish(topic_for_subscribing);
+		ros::spinOnce();
+	}
+}
+
+void AnnotationPanel::topicSelect(const QString& txt)
+{
+	std_msgs::String topic_for_subscribing;
+	topic_for_subscribing.data = cluster_topic_list->currentText().toStdString();
+	topic_pub.publish(topic_for_subscribing);
+	ros::spinOnce();
 }
 
 void AnnotationPanel::handleTxtChanged()
@@ -99,7 +148,7 @@ void AnnotationPanel::buttonAction()
   }
 
   //write out annotation
-  //csvfile << cluster_name_edit->text().toStdString() << "," << msg_time << "," << msg_topic << "," << msg_callerid << "," << msg_type;
+  csvfile << cluster_name_edit->text().toStdString();
   csvfile << ",[";
 
   bool first_time = true;
