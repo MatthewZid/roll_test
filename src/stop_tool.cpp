@@ -1,12 +1,14 @@
 #include <roll_test/stop_tool.h>
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
-#include <std_msgs/String.h>
 #include <geometry_msgs/Point.h>
+#include <std_msgs/String.h>
 #include <roll_test/PointSelection.h>
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 
+ros::NodeHandle nh;
 ros::Subscriber pointsub;
+ros::Subscriber topic_sub;
 ros::Publisher selection_pub;
 pointcloud_msgs::PointCloud2_Segments cluster_msg;
 
@@ -15,6 +17,13 @@ void pointCallback(const pointcloud_msgs::PointCloud2_Segments& msg)
     ROS_WARN("Stop tool: Message received\n");
 
     cluster_msg = msg;
+}
+
+void topicCallback(const std_msgs::String& msg)
+{
+	pointsub.shutdown();
+	pointsub = nh.subscribe(msg.data, 1, pointCallback);
+	ROS_INFO("Subscribed to main topic: %s\n", msg.data.c_str());
 }
 
 namespace roll_test
@@ -84,11 +93,11 @@ void StopTool::onInitialize()
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
   }*/
-    ros::NodeHandle nh;
-    std::string input_topic;
+    /*std::string input_topic;
     nh.param("pointcloud2_segments_viz/input_topic",input_topic, std::string("/new_pcl"));
 
-    pointsub = nh.subscribe(input_topic, 1, pointCallback);
+    pointsub = nh.subscribe(input_topic, 1, pointCallback);*/
+    topic_sub = nh.subscribe("roll_test/publishing_topic", 1, topicCallback);
     selection_pub = nh.advertise<roll_test::PointSelection>("selection_topic", 1);
 }
 
@@ -342,14 +351,14 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				}
 
 				//publish state - all id's identical: clean cluster, different id's: dirty cluster
-				std_msgs::String state_msg;
+				std::string state_msg;
 
 				if(isDifferent)
-					state_msg.data = "Dirty cluster!";
+					state_msg = "Dirty cluster!";
 				else
-					state_msg.data = "Clean cluster";
+					state_msg = "Clean cluster";
 
-				found_points.state_msg = state_msg;
+				found_points.state_msg.data = state_msg;
 
 				selection_pub.publish(found_points);
 				ros::spinOnce();
