@@ -3,11 +3,18 @@
 QLineEdit* id_state_show;
 std::vector<geometry_msgs::Point> selected_points;
 
+ros::Time msg_stamp;
+
 void selectionCallback(const roll_test::PointSelection& msg)
 {
   selected_points = msg.points;
   id_state_show->setText(QString(msg.state_msg.data.c_str()));
   ROS_WARN("Received selected points\n");
+}
+
+void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
+{
+	msg_stamp = msg->header.stamp;
 }
 
 namespace roll_test
@@ -53,6 +60,8 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   cluster_topic_list = new QComboBox;
   cluster_topic_list->setEditable(true);
   topic_list_layout->addWidget(cluster_topic_list);
+  refresh_btn = new QPushButton("Refresh");
+  topic_list_layout->addWidget(refresh_btn);
 
   QVBoxLayout* cluster_name_main_layout = new QVBoxLayout;
   cluster_name_main_layout->addLayout(cluster_name_layout);
@@ -73,48 +82,26 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   // Next we make signal/slot connections.
   connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
   connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
+  connect(refresh_btn, SIGNAL(released()), this, SLOT(refreshAction()));
   connect(cluster_topic_list, SIGNAL(currentIndexChanged(const QString&)), this, SLOT(topicSelect(const QString&)));
 }
 
 void AnnotationPanel::onInitialize()
 {
 	//ROS handling setup
-  	selection_sub = nh.subscribe("selection_topic", 1, selectionCallback);
-  	topic_pub = nh.advertise<std_msgs::String>("roll_test/publishing_topic", 1);
+  	selection_sub = nh.subscribe("roll_test/selection_topic", 1, selectionCallback);
 
-	int topic_index = 0;
-	ros::master::V_TopicInfo master_topics;
-	ros::master::getTopics(master_topics);
-
-	for(auto it = master_topics.begin(); it != master_topics.end(); it++)
-	{
-		const ros::master::TopicInfo& info = *it;
-
-		if(info.datatype.find("PointCloud2") != std::string::npos)
-			cluster_topic_list->insertItem(topic_index++, QString(info.name.c_str()));
-	}
-
-	if(cluster_topic_list->count() > 0){
-		cluster_topic_list->setCurrentIndex(0);
-
-		std_msgs::String topic_for_subscribing;
-		topic_for_subscribing.data = cluster_topic_list->currentText().toStdString();
-
-		ROS_INFO("Publishing main topic: %s\n", topic_for_subscribing.data.c_str());
-		while(topic_pub.getNumSubscribers() == 0)
-			ros::spinOnce();
-
-		topic_pub.publish(topic_for_subscribing);
-		ros::spinOnce();
-	}
+  	createTopicList();
 }
 
 void AnnotationPanel::topicSelect(const QString& txt)
 {
-	std_msgs::String topic_for_subscribing;
-	topic_for_subscribing.data = cluster_topic_list->currentText().toStdString();
-	topic_pub.publish(topic_for_subscribing);
-	ros::spinOnce();
+	viz_sub.shutdown();
+
+	if(cluster_topic_list->count() > 0){
+		viz_sub = nh.subscribe(txt.toStdString(), 1, vizCallback);
+		ROS_INFO("Subscribed to topic: %s\n", txt.toStdString().c_str());
+	}
 }
 
 void AnnotationPanel::handleTxtChanged()
@@ -148,7 +135,8 @@ void AnnotationPanel::buttonAction()
   }
 
   //write out annotation
-  csvfile << cluster_name_edit->text().toStdString();
+  csvfile << cluster_name_edit->text().toStdString() << "," << msg_stamp << "," << cluster_topic_list->currentText().toStdString();
+  csvfile << ",sensor_msgs/PointCloud2";
   csvfile << ",[";
 
   bool first_time = true;
@@ -165,6 +153,39 @@ void AnnotationPanel::buttonAction()
   csvfile << "]" << std::endl;
 
   csvfile.close();
+}
+
+void AnnotationPanel::refreshAction()
+{
+	for(int i=0; i < cluster_topic_list->count(); i++)
+		cluster_topic_list->removeItem(i);
+
+	createTopicList();
+
+	ROS_INFO("Topic list refreshed\n");
+}
+
+void AnnotationPanel::createTopicList()
+{
+	int topic_index = 0;
+	ros::master::V_TopicInfo master_topics;
+	ros::master::getTopics(master_topics);
+
+	for(auto it = master_topics.begin(); it != master_topics.end(); it++)
+	{
+		const ros::master::TopicInfo& info = *it;
+
+		if(info.datatype.find("sensor_msgs/PointCloud2") != std::string::npos)
+			cluster_topic_list->insertItem(topic_index++, QString(info.name.c_str()));
+	}
+
+	viz_sub.shutdown();
+
+	if(cluster_topic_list->count() > 0){
+		cluster_topic_list->setCurrentIndex(0);
+		viz_sub = nh.subscribe(cluster_topic_list->currentText().toStdString(), 1, vizCallback);
+		ROS_INFO("Subscribed to topic: %s\n", cluster_topic_list->currentText().toStdString().c_str());
+	}
 }
 
 // Save all configuration data from this panel to the given

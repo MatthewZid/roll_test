@@ -4,8 +4,8 @@
 #ifndef Q_MOC_RUN
 # include <ros/ros.h>
 #include <geometry_msgs/Point.h>
-#include <std_msgs/String.h>
 #include <roll_test/PointSelection.h>
+#include <sensor_msgs/PointCloud2.h>
 
 # include <rviz/panel.h>
 
@@ -66,16 +66,22 @@ public Q_SLOTS:
 
   void topicSelect(const QString& txt);
 
+  void refreshAction();
+
+private:
+  void createTopicList();
+
   // Then we finish up with protected member variables.
 protected:
   QPushButton *cluster_name_btn;
   QLineEdit* cluster_name_edit;
   QComboBox* cluster_topic_list;
+  QPushButton *refresh_btn;
 
   // The ROS node handle.
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
-  ros::Publisher topic_pub;
+  ros::Subscriber viz_sub;
   // END_TUTORIAL
 };
 
