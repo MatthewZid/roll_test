@@ -2,28 +2,19 @@
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <geometry_msgs/Point.h>
-#include <std_msgs/String.h>
 #include <roll_test/PointSelection.h>
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 
 ros::NodeHandle nh;
 ros::Subscriber pointsub;
-ros::Subscriber topic_sub;
 ros::Publisher selection_pub;
 pointcloud_msgs::PointCloud2_Segments cluster_msg;
 
-void pointCallback(const pointcloud_msgs::PointCloud2_Segments& msg)
+void pointsCallback(const pointcloud_msgs::PointCloud2_Segments& msg)
 {
     ROS_WARN("Stop tool: Message received\n");
 
     cluster_msg = msg;
-}
-
-void topicCallback(const std_msgs::String& msg)
-{
-	pointsub.shutdown();
-	pointsub = nh.subscribe(msg.data, 1, pointCallback);
-	ROS_INFO("Subscribed to main topic: %s\n", msg.data.c_str());
 }
 
 namespace roll_test
@@ -93,12 +84,10 @@ void StopTool::onInitialize()
 	point_nodes_.push_back(node);
 	manual_objects_.push_back(manual);
   }*/
-    /*std::string input_topic;
-    nh.param("pointcloud2_segments_viz/input_topic",input_topic, std::string("/new_pcl"));
+    std::string input_topic = "pointcloud2_cluster_tracking/clusters";
 
-    pointsub = nh.subscribe(input_topic, 1, pointCallback);*/
-    topic_sub = nh.subscribe("roll_test/publishing_topic", 1, topicCallback);
-    selection_pub = nh.advertise<roll_test::PointSelection>("selection_topic", 1);
+    pointsub = nh.subscribe(input_topic, 1, pointsCallback);
+    selection_pub = nh.advertise<roll_test::PointSelection>("roll_test/selection_topic", 1);
 }
 
 void StopTool::activate()
@@ -244,7 +233,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 
 			//actual selection (defined by type)
 			rviz::SelectionManager::SelectType type = rviz::SelectionManager::Replace;
-			rviz::M_Picked selection;
+			//rviz::M_Picked selection;
 
 			if(event.shift())
 				type = rviz::SelectionManager::Add;
