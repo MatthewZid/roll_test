@@ -324,6 +324,8 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				ROS_WARN("Missing cloud points!\n");
 
 			//find different id's
+			std::string state_msg;
+
 			if(found_point_cntr != 0)
 			{
 				auto it_begin = found_clusters.begin();
@@ -340,20 +342,21 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 				}
 
 				//publish state - all id's identical: clean cluster, different id's: dirty cluster
-				std::string state_msg;
-
 				if(isDifferent)
 					state_msg = "Dirty cluster!";
 				else
 					state_msg = "Clean cluster";
-
-				found_points.state_msg.data = state_msg;
-
-				selection_pub.publish(found_points);
-				ros::spinOnce();
 			}
-			else
+			else{
 				ROS_WARN("No selected points found!\n");
+
+				state_msg = "";
+			}
+
+			found_points.state_msg.data = state_msg;
+
+			selection_pub.publish(found_points);
+			ros::spinOnce();
 
 			///////////////////////////////////////// TESTING AREA ////////////////////////////////////////////////////////////
 
