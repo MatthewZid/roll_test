@@ -74,9 +74,11 @@ private:
   // Then we finish up with protected member variables.
 protected:
   QPushButton *cluster_name_btn;
+  QPushButton *cluster_join_btn;
   QLineEdit* cluster_name_edit;
   QComboBox* cluster_topic_list;
   QPushButton *refresh_btn;
+  QPushButton *divide_btn;
 
   // The ROS node handle.
   ros::NodeHandle nh;

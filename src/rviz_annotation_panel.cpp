@@ -7,6 +7,7 @@ ros::Time msg_stamp;
 
 void selectionCallback(const roll_test::PointSelection& msg)
 {
+  selected_points.clear();
   selected_points = msg.points;
   id_state_show->setText(QString(msg.state_msg.data.c_str()));
   ROS_WARN("Received selected points\n");
@@ -45,15 +46,26 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   id_state_show->setReadOnly(true);
   id_state_layout->addWidget(id_state_show);
 
+  QGridLayout* cluster_mngment_layout = new QGridLayout;
+  cluster_mngment_layout->addWidget(new QLabel("Selection:"), 0, 0, 1, 1);
+  cluster_join_btn = new QPushButton(tr("Join"));
+  cluster_mngment_layout->addWidget(cluster_join_btn, 0, 1, 1, 1);
+  cluster_join_btn->setEnabled(false);
+  cluster_mngment_layout->addWidget(new QLabel(" or "), 0, 2, 1, 1);
+  divide_btn = new QPushButton(tr("Divide"));
+  cluster_mngment_layout->setColumnStretch(3, 1);
+  cluster_mngment_layout->setColumnStretch(4, 1);
+  cluster_mngment_layout->addWidget(divide_btn, 0, 3, 1, 1);
+  divide_btn->setEnabled(false);
+
   QHBoxLayout* cluster_name_layout = new QHBoxLayout;
-  cluster_name_layout->addWidget(new QLabel("Name selected cluster:"));
   cluster_name_edit = new QLineEdit;
   cluster_name_edit->setPlaceholderText("Enter name");
-  cluster_name_edit->setEnabled(false);
+  cluster_name_edit->setVisible(false);
   cluster_name_layout->addWidget(cluster_name_edit);
   cluster_name_btn = new QPushButton("Name cluster");
+  cluster_name_btn->setVisible(false);
   cluster_name_layout->addWidget(cluster_name_btn);
-  cluster_name_btn->setEnabled(false);
 
   QHBoxLayout* topic_list_layout = new QHBoxLayout;
   topic_list_layout->addWidget(new QLabel("Topic list:"));
@@ -64,13 +76,14 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   topic_list_layout->addWidget(refresh_btn);
 
   QVBoxLayout* cluster_name_main_layout = new QVBoxLayout;
+  cluster_name_main_layout->addLayout(cluster_mngment_layout);
   cluster_name_main_layout->addLayout(cluster_name_layout);
   cluster_name_main_layout->addLayout(topic_list_layout);
 
   QGroupBox* cluster_id_group = new QGroupBox("Cluster state");
   cluster_id_group->setLayout(id_state_layout);
 
-  QGroupBox* cluster_name_group = new QGroupBox("Cluster class name");
+  QGroupBox* cluster_name_group = new QGroupBox("Cluster management");
   cluster_name_group->setLayout(cluster_name_main_layout);
 
   QVBoxLayout* main_layout = new QVBoxLayout;
@@ -82,6 +95,8 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   // Next we make signal/slot connections.
   connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
   connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
+  connect(cluster_join_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
+  connect(divide_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
   connect(refresh_btn, SIGNAL(released()), this, SLOT(refreshAction()));
   connect(cluster_topic_list, SIGNAL(currentIndexChanged(const QString&)), this, SLOT(topicSelect(const QString&)));
 }
@@ -96,6 +111,11 @@ void AnnotationPanel::onInitialize()
 
 void AnnotationPanel::topicSelect(const QString& txt)
 {
+	std::string current_topic = viz_sub.getTopic();
+
+	if(txt.toStdString() == current_topic)
+		return;
+
 	viz_sub.shutdown();
 
 	if(cluster_topic_list->count() > 0){
@@ -107,12 +127,12 @@ void AnnotationPanel::topicSelect(const QString& txt)
 void AnnotationPanel::handleTxtChanged()
 {
   if(id_state_show->text().toStdString() == ""){
-    cluster_name_edit->setEnabled(false);
-    cluster_name_btn->setEnabled(false);
+    cluster_join_btn->setEnabled(false);
+    divide_btn->setEnabled(false);
   }
   else{
-    cluster_name_edit->setEnabled(true);
-    cluster_name_btn->setEnabled(true);
+    cluster_join_btn->setEnabled(true);
+    divide_btn->setEnabled(true);
 
     if(id_state_show->text().toStdString() != "Clean cluster")
       ROS_WARN("Annotation panel: Multiple id's detected in selection.\nIf points belong to different objects, they need manual re-clustering\n");
@@ -121,38 +141,59 @@ void AnnotationPanel::handleTxtChanged()
 
 void AnnotationPanel::buttonAction()
 {
-  std::string homepath = std::getenv("HOME");
-  std::string filename = "annotation.csv";
-  std::string csv_path = homepath + "/Ros_WS/" + filename;
+  QPushButton* buttonSender = qobject_cast<QPushButton*>(sender()); // retrieve the button you have clicked
+  std::string buttonName = buttonSender->text().toStdString();
 
-  std::ofstream csvfile;
-  csvfile.open(csv_path, std::ios::out | std::ios::app);
-
-  if(!csvfile.is_open())
+  if(buttonName == "Name cluster")
   {
-    ROS_FATAL("%s could not be opened!\n", filename.c_str());
-    ros::shutdown();
+	  std::string homepath = std::getenv("HOME");
+	  std::string filename = "annotation.csv";
+	  std::string csv_path = homepath + "/Ros_WS/" + filename;
+
+	  std::ofstream csvfile;
+	  csvfile.open(csv_path, std::ios::out | std::ios::app);
+
+	  if(!csvfile.is_open())
+	  {
+	    ROS_FATAL("%s could not be opened!\n", filename.c_str());
+	    ros::shutdown();
+	  }
+
+	  //write out annotation
+	  csvfile << cluster_name_edit->text().toStdString() << "," << msg_stamp << "," << cluster_topic_list->currentText().toStdString();
+	  csvfile << ",sensor_msgs/PointCloud2";
+	  csvfile << ",[";
+
+	  bool first_time = true;
+	  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
+	  {
+	    if(first_time)
+	      first_time = false;
+	    else
+	      csvfile << ",";
+	    
+	    csvfile << it->x << "," << it->y << "," << it->z;
+	  }
+
+	  csvfile << "]" << std::endl;
+
+	  csvfile.close();
+
+	  cluster_name_edit->setVisible(false);
+	  cluster_name_btn->setVisible(false);
   }
-
-  //write out annotation
-  csvfile << cluster_name_edit->text().toStdString() << "," << msg_stamp << "," << cluster_topic_list->currentText().toStdString();
-  csvfile << ",sensor_msgs/PointCloud2";
-  csvfile << ",[";
-
-  bool first_time = true;
-  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
+  else if(buttonName == "&Join")
   {
-    if(first_time)
-      first_time = false;
-    else
-      csvfile << ",";
-    
-    csvfile << it->x << "," << it->y << "," << it->z;
+  	cluster_name_edit->setVisible(true);
+  	cluster_name_btn->setVisible(true);
+  	cluster_join_btn->setEnabled(false);
+  	divide_btn->setEnabled(false);
   }
-
-  csvfile << "]" << std::endl;
-
-  csvfile.close();
+  else if(buttonName == "D&ivide")
+  {
+  	cluster_join_btn->setEnabled(false);
+  	divide_btn->setEnabled(false);
+  }
 }
 
 void AnnotationPanel::refreshAction()
@@ -178,6 +219,11 @@ void AnnotationPanel::createTopicList()
 		if(info.datatype.find("sensor_msgs/PointCloud2") != std::string::npos)
 			cluster_topic_list->insertItem(topic_index++, QString(info.name.c_str()));
 	}
+
+	std::string current_topic = viz_sub.getTopic();
+
+	if(cluster_topic_list->currentText().toStdString() == current_topic)
+		return;
 
 	viz_sub.shutdown();
 
