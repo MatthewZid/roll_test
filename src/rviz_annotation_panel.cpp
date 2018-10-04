@@ -146,6 +146,9 @@ void AnnotationPanel::buttonAction()
 
   if(buttonName == "Name cluster")
   {
+  	  if(selected_points.empty())
+  	  	return;
+
 	  std::string homepath = std::getenv("HOME");
 	  std::string filename = "annotation.csv";
 	  std::string csv_path = homepath + "/Ros_WS/" + filename;
@@ -181,6 +184,31 @@ void AnnotationPanel::buttonAction()
 
 	  cluster_name_edit->setVisible(false);
 	  cluster_name_btn->setVisible(false);
+
+	  //aabb around selected points (with marker)
+	  Eigen::Vector4f centroid;
+  	  Eigen::Vector4f min;
+  	  Eigen::Vector4f max; 
+
+	  pcl::PointCloud<pcl::PointXYZ> cloud;
+	  cloud.width = selected_points.size();
+	  cloud.height = 1;
+	  cloud.is_dense = false;
+	  cloud.points.resize(cloud.width * cloud.height);
+
+	  int cnt = 0;
+	  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
+	  {
+	  	cloud.points[cnt].x = it->x;
+	  	cloud.points[cnt].y = it->y;
+	  	cloud.points[cnt].z = it->z;
+	  	cnt++;
+	  }
+
+	  pcl::compute3DCentroid(cloud, centroid);
+	  pcl::getMinMax3D(cloud, min, max);
+
+	  //create marker
   }
   else if(buttonName == "&Join")
   {
@@ -221,8 +249,9 @@ void AnnotationPanel::createTopicList()
 	}
 
 	std::string current_topic = viz_sub.getTopic();
+	std::string current_list = cluster_topic_list->currentText().toStdString();
 
-	if(cluster_topic_list->currentText().toStdString() == current_topic)
+	if(current_list == current_topic)
 		return;
 
 	viz_sub.shutdown();
