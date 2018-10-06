@@ -65,7 +65,10 @@ public:
 public Q_SLOTS:
   void handleTxtChanged();
 
-  void buttonAction();
+  void nameClusterButton();
+  void joinButton();
+  void divideButton();
+  void cancelButton();
 
   void topicSelect(const QString& txt);
 
@@ -82,6 +85,7 @@ protected:
   QComboBox* cluster_topic_list;
   QPushButton *refresh_btn;
   QPushButton *divide_btn;
+  QPushButton *cancel_btn;
 
   // The ROS node handle.
   ros::NodeHandle nh;

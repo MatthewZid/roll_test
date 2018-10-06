@@ -78,6 +78,9 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   QVBoxLayout* cluster_name_main_layout = new QVBoxLayout;
   cluster_name_main_layout->addLayout(cluster_mngment_layout);
   cluster_name_main_layout->addLayout(cluster_name_layout);
+  cancel_btn = new QPushButton("Cancel naming");
+  cancel_btn->setVisible(false);
+  cluster_name_main_layout->addWidget(cancel_btn);
   cluster_name_main_layout->addLayout(topic_list_layout);
 
   QGroupBox* cluster_id_group = new QGroupBox("Cluster state");
@@ -94,9 +97,10 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
 
   // Next we make signal/slot connections.
   connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
-  connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
-  connect(cluster_join_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
-  connect(divide_btn, SIGNAL( released() ), this, SLOT(buttonAction()));
+  connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(nameClusterButton()));
+  connect(cluster_join_btn, SIGNAL( released() ), this, SLOT(joinButton()));
+  connect(divide_btn, SIGNAL( released() ), this, SLOT(divideButton()));
+  connect(cancel_btn, SIGNAL( released() ), this, SLOT(cancelButton()));
   connect(refresh_btn, SIGNAL(released()), this, SLOT(refreshAction()));
   connect(cluster_topic_list, SIGNAL(currentIndexChanged(const QString&)), this, SLOT(topicSelect(const QString&)));
 }
@@ -139,89 +143,95 @@ void AnnotationPanel::handleTxtChanged()
   }
 }
 
-void AnnotationPanel::buttonAction()
+void AnnotationPanel::nameClusterButton()
 {
-  QPushButton* buttonSender = qobject_cast<QPushButton*>(sender()); // retrieve the button you have clicked
-  std::string buttonName = buttonSender->text().toStdString();
+  if(selected_points.empty())
+    return;
 
-  if(buttonName == "Name cluster")
+  std::string homepath = std::getenv("HOME");
+  std::string filename = "annotation.csv";
+  std::string csv_path = homepath + "/Ros_WS/" + filename;
+
+  std::ofstream csvfile;
+  csvfile.open(csv_path, std::ios::out | std::ios::app);
+
+  if(!csvfile.is_open())
   {
-  	  if(selected_points.empty())
-  	  	return;
-
-	  std::string homepath = std::getenv("HOME");
-	  std::string filename = "annotation.csv";
-	  std::string csv_path = homepath + "/Ros_WS/" + filename;
-
-	  std::ofstream csvfile;
-	  csvfile.open(csv_path, std::ios::out | std::ios::app);
-
-	  if(!csvfile.is_open())
-	  {
-	    ROS_FATAL("%s could not be opened!\n", filename.c_str());
-	    ros::shutdown();
-	  }
-
-	  //write out annotation
-	  csvfile << cluster_name_edit->text().toStdString() << "," << msg_stamp << "," << cluster_topic_list->currentText().toStdString();
-	  csvfile << ",sensor_msgs/PointCloud2";
-	  csvfile << ",[";
-
-	  bool first_time = true;
-	  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
-	  {
-	    if(first_time)
-	      first_time = false;
-	    else
-	      csvfile << ",";
-	    
-	    csvfile << it->x << "," << it->y << "," << it->z;
-	  }
-
-	  csvfile << "]" << std::endl;
-
-	  csvfile.close();
-
-	  cluster_name_edit->setVisible(false);
-	  cluster_name_btn->setVisible(false);
-
-	  //aabb around selected points (with marker)
-	  Eigen::Vector4f centroid;
-  	  Eigen::Vector4f min;
-  	  Eigen::Vector4f max; 
-
-	  pcl::PointCloud<pcl::PointXYZ> cloud;
-	  cloud.width = selected_points.size();
-	  cloud.height = 1;
-	  cloud.is_dense = false;
-	  cloud.points.resize(cloud.width * cloud.height);
-
-	  int cnt = 0;
-	  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
-	  {
-	  	cloud.points[cnt].x = it->x;
-	  	cloud.points[cnt].y = it->y;
-	  	cloud.points[cnt].z = it->z;
-	  	cnt++;
-	  }
-
-	  pcl::compute3DCentroid(cloud, centroid);
-	  pcl::getMinMax3D(cloud, min, max);
-
-	  //create marker
+    ROS_FATAL("%s could not be opened!\n", filename.c_str());
+    ros::shutdown();
   }
-  else if(buttonName == "&Join")
+
+  //write out annotation
+  csvfile << cluster_name_edit->text().toStdString() << "," << msg_stamp << "," << cluster_topic_list->currentText().toStdString();
+  csvfile << ",sensor_msgs/PointCloud2";
+  csvfile << ",[";
+
+  bool first_time = true;
+  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
   {
-  	cluster_name_edit->setVisible(true);
-  	cluster_name_btn->setVisible(true);
-  	cluster_join_btn->setEnabled(false);
-  	divide_btn->setEnabled(false);
+    if(first_time)
+      first_time = false;
+    else
+      csvfile << ",";
+    
+    csvfile << it->x << "," << it->y << "," << it->z;
   }
-  else if(buttonName == "D&ivide")
+
+  csvfile << "]" << std::endl;
+
+  csvfile.close();
+
+  cluster_name_edit->setVisible(false);
+  cluster_name_btn->setVisible(false);
+
+  //aabb around selected points (with marker)
+  Eigen::Vector4f centroid;
+  Eigen::Vector4f min;
+  Eigen::Vector4f max; 
+
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  cloud.width = selected_points.size();
+  cloud.height = 1;
+  cloud.is_dense = false;
+  cloud.points.resize(cloud.width * cloud.height);
+
+  int cnt = 0;
+  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
   {
-  	cluster_join_btn->setEnabled(false);
-  	divide_btn->setEnabled(false);
+    cloud.points[cnt].x = it->x;
+    cloud.points[cnt].y = it->y;
+    cloud.points[cnt].z = it->z;
+    cnt++;
   }
+
+  pcl::compute3DCentroid(cloud, centroid);
+  pcl::getMinMax3D(cloud, min, max);
+
+  //create marker
+}
+
+void AnnotationPanel::joinButton()
+{
+  cluster_name_edit->setVisible(true);
+  cluster_name_btn->setVisible(true);
+  cancel_btn->setVisible(true);
+  cluster_join_btn->setEnabled(false);
+  divide_btn->setEnabled(false);
+}
+
+void AnnotationPanel::divideButton()
+{
+  cluster_join_btn->setEnabled(false);
+  divide_btn->setEnabled(false);
+}
+
+void AnnotationPanel::cancelButton()
+{
+  cluster_name_edit->setVisible(false);
+  cluster_name_btn->setVisible(false);
+  cancel_btn->setVisible(false);
+  cluster_join_btn->setEnabled(true);
+  divide_btn->setEnabled(true);
 }
 
 void AnnotationPanel::refreshAction()
