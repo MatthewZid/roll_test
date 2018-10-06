@@ -98,9 +98,20 @@ protected Q_SLOTS:
 
 private Q_SLOTS:
   void bagSelect(const int index);
-  void handleButton();
+
+  void startButton();
+  void pauseButton();
+  void stepButton();
+  void backstepButton();
+  void folderButton();
+  void terminateButton();
+
   void enableStartBtn();
-  void handleCheckBox();
+
+  void loopCheckbox();
+  void quietCheckbox();
+  void syncCheckbox();
+  void clockCheckbox();
 
 private:
   int findBagfiles();
@@ -124,6 +135,7 @@ protected:
   QString bag_path;
 
   rviz_rosbag::PlayerOptions* options;
+  bool paused_;
 
   // The latest velocity values from the drive widget.
   float linear_velocity_;

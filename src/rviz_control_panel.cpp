@@ -66,6 +66,7 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   options->bag_time_frequency = 100.0f;
 
   rosbag_player = new rviz_rosbag::Player(*options);
+  paused_ = false;
 
   // Next we lay out the "output topic" text entry field using a
   // QLabel and a QLineEdit in a QHBoxLayout.
@@ -164,20 +165,20 @@ RvizCntrlPanel::RvizCntrlPanel( QWidget* parent )
   //connect(bagmenu, QOverload<int>::of(&QComboBox::activated), [=](int index){bagSelect(index);});
   qRegisterMetaType< QVector<int> >("QVector<int>");  //fixes QVector<int> error in conncet
   connect(bagmenu, SIGNAL(activated(int)), this, SLOT(bagSelect(const int)));
-  connect(filediag_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(filediag_button, SIGNAL(released()), this, SLOT(folderButton()));
 
-  connect(start_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(start_button, SIGNAL(released()), this, SLOT(startButton()));
   connect(start_button, SIGNAL(pressed()), this, SLOT(enableStartBtn()));
-  connect(pause_button, SIGNAL(released()), this, SLOT(handleButton()));
-  connect(step_button, SIGNAL(pressed()), this, SLOT(handleButton()));
-  connect(backstep_button, SIGNAL(pressed()), this, SLOT(handleButton()));
+  connect(pause_button, SIGNAL(released()), this, SLOT(pauseButton()));
+  connect(step_button, SIGNAL(pressed()), this, SLOT(stepButton()));
+  connect(backstep_button, SIGNAL(pressed()), this, SLOT(backstepButton()));
 
-  connect(cancel_loop_button, SIGNAL(released()), this, SLOT(handleButton()));
+  connect(cancel_loop_button, SIGNAL(released()), this, SLOT(terminateButton()));
 
-  connect(loop_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
-  connect(quiet_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
-  connect(sync_topics_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
-  connect(clock_checkbox, SIGNAL(stateChanged(int)), this, SLOT(handleCheckBox()));
+  connect(loop_checkbox, SIGNAL(stateChanged(int)), this, SLOT(loopCheckbox()));
+  connect(quiet_checkbox, SIGNAL(stateChanged(int)), this, SLOT(quietCheckbox()));
+  connect(sync_topics_checkbox, SIGNAL(stateChanged(int)), this, SLOT(syncCheckbox()));
+  connect(clock_checkbox, SIGNAL(stateChanged(int)), this, SLOT(clockCheckbox()));
   //QObject::connect( q_widget_, SIGNAL( outputVelocity( float, float )), this, SLOT( setVel( float, float )));
   //connect( rosbag_player_input_, SIGNAL( editingFinished() ), this, SLOT( updateChoice() ));
   //QObject::connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
@@ -224,142 +225,142 @@ void RvizCntrlPanel::enableStartBtn()
   filediag_button->setEnabled(true);
 }
 
-void RvizCntrlPanel::handleButton()
+void RvizCntrlPanel::startButton()
 {
-  QPushButton* buttonSender = qobject_cast<QPushButton*>(QObject::sender());
-  std::string button_name = buttonSender->text().toStdString();
+  start_button->setEnabled(false);
+  bagmenu->setEnabled(false);
+  pause_button->setEnabled(true);
+  step_button->setEnabled(true);
+  backstep_button->setEnabled(true);
+  cancel_loop_button->setEnabled(true);
 
-  if(button_name == "Start")
-  {
-    //Start button actions
-    start_button->setEnabled(false);
-    bagmenu->setEnabled(false);
-    pause_button->setEnabled(true);
-    step_button->setEnabled(true);
-    backstep_button->setEnabled(true);
-    cancel_loop_button->setEnabled(true);
+  loop_checkbox->setEnabled(false);
+  quiet_checkbox->setEnabled(false);
+  clock_checkbox->setEnabled(false);
 
-    loop_checkbox->setEnabled(false);
-    quiet_checkbox->setEnabled(false);
-    clock_checkbox->setEnabled(false);
+  current_bagpath->setEnabled(false);
+  filediag_button->setEnabled(false);
 
-    current_bagpath->setEnabled(false);
-    filediag_button->setEnabled(false);
-
-    if(loop_checkbox->isChecked()){
-      options->loop = true;
-      rosbag_player->changeOptions(*options);
-    }
-
-    QApplication::processEvents();
-
-    std::thread buttonStart(runPlayer);
-    buttonStart.detach();
-  }
-  else if(button_name == "Pause" or button_name == "Resume")
-  {  
-    //Stop button actions
-    (rosbag_player->lock_choice_).lock();
-    rosbag_player->setChoice(' ');
-    (rosbag_player->lock_choice_).unlock();
-
-    if(button_name == "Pause")
-      pause_button->setText("Resume");
-    else
-      pause_button->setText("Pause");
-  }
-  else if(button_name == ">>")
-  {
-    //Step button actions
-    (rosbag_player->lock_choice_).lock();
-    rosbag_player->setChoice('s');
-    (rosbag_player->lock_choice_).unlock();
-  }
-  else if(button_name == "<<")
-  {
-    //Backstep button actions
-    (rosbag_player->lock_choice_).lock();
-    rosbag_player->setChoice('b');
-    (rosbag_player->lock_choice_).unlock();
-  }
-  else if(button_name == "...")
-  {
-    std::string homepath = std::getenv("HOME");
-    QString qHomepath = QString::fromStdString(homepath);
-    bag_path = QFileDialog::getExistingDirectory(this, "Open bagfile directory", qHomepath, QFileDialog::ShowDirsOnly
-                                                                                                | QFileDialog::DontResolveSymlinks
-                                                                                                | QFileDialog::DontUseNativeDialog);
-    if(bag_path == "")
-      bag_path = current_bagpath->text();
-
-    if(bag_path != current_bagpath->text())
-    {
-      bag_files_.clear();
-      bagmenu->clear();
-
-      bagpath_file_count = findBagfiles();
-
-      for(int i = 0; i < bagpath_file_count; i++)
-        bagmenu->insertItem(i, QString(bag_files_[i].c_str()));
-
-      current_bagpath->setText(bag_path);
-
-      options->bags.clear();
-      std::string bagfile = bag_path.toStdString() + "/" + bag_files_[0];
-
-      options->bags.push_back(bagfile);
-      rosbag_player->changeOptions(*options);
-    }
-  }
-  else if(button_name == "Term&inate")
-  {
-    //Terminate loop
-    pause_button->setEnabled(false);
-    step_button->setEnabled(false);
-    backstep_button->setEnabled(false);
-    cancel_loop_button->setEnabled(false);
-    
-    options->loop = false;
+  if(loop_checkbox->isChecked()){
+    options->loop = true;
     rosbag_player->changeOptions(*options);
-    rosbag_player->setTerminate(true);
+  }
+
+  QApplication::processEvents();
+
+  std::thread buttonStart(runPlayer);
+  buttonStart.detach();
+}
+
+void RvizCntrlPanel::pauseButton()
+{
+  //Stop button actions
+  (rosbag_player->lock_choice_).lock();
+  rosbag_player->setChoice(' ');
+  (rosbag_player->lock_choice_).unlock();
+
+  paused_ = !paused_;
+
+  if(paused_)
+    pause_button->setText("Resume");
+  else
+    pause_button->setText("Pause");
+}
+
+void RvizCntrlPanel::stepButton()
+{
+  (rosbag_player->lock_choice_).lock();
+  rosbag_player->setChoice('s');
+  (rosbag_player->lock_choice_).unlock();
+}
+
+void RvizCntrlPanel::backstepButton()
+{
+  (rosbag_player->lock_choice_).lock();
+  rosbag_player->setChoice('b');
+  (rosbag_player->lock_choice_).unlock();
+}
+
+void RvizCntrlPanel::folderButton()
+{
+  std::string homepath = std::getenv("HOME");
+  QString qHomepath = QString::fromStdString(homepath);
+  bag_path = QFileDialog::getExistingDirectory(this, "Open bagfile directory", qHomepath, QFileDialog::ShowDirsOnly
+                                                                                              | QFileDialog::DontResolveSymlinks
+                                                                                              | QFileDialog::DontUseNativeDialog);
+  if(bag_path == "")
+    bag_path = current_bagpath->text();
+
+  if(bag_path != current_bagpath->text())
+  {
+    bag_files_.clear();
+    bagmenu->clear();
+
+    bagpath_file_count = findBagfiles();
+
+    for(int i = 0; i < bagpath_file_count; i++)
+      bagmenu->insertItem(i, QString(bag_files_[i].c_str()));
+
+    current_bagpath->setText(bag_path);
+
+    options->bags.clear();
+    std::string bagfile = bag_path.toStdString() + "/" + bag_files_[0];
+
+    options->bags.push_back(bagfile);
+    rosbag_player->changeOptions(*options);
   }
 }
 
-void RvizCntrlPanel::handleCheckBox()
+void RvizCntrlPanel::terminateButton()
 {
-	QCheckBox* checkboxSender = qobject_cast<QCheckBox*>(QObject::sender());
-	std::string checkbox_name = checkboxSender->text().toStdString();
+  pause_button->setEnabled(false);
+  step_button->setEnabled(false);
+  backstep_button->setEnabled(false);
+  cancel_loop_button->setEnabled(false);
+  
+  options->loop = false;
+  rosbag_player->changeOptions(*options);
+  rosbag_player->setTerminate(true);
+}
 
-	if(checkbox_name == "&Loop")
-	{
-		if(loop_checkbox->checkState() == Qt::Checked)
-			options->loop = true;
-		else
-			options->loop = false;
-	}
-	else if(checkbox_name == "&Quiet")
-	{
-		if(quiet_checkbox->checkState() == Qt::Checked)
-			options->quiet = true;
-		else
-			options->quiet = false;
-	}
-  else if(checkbox_name == "S&ync Topics")
-  {
-    if(sync_topics_checkbox->checkState() == Qt::Checked)
-      options->sync_topics = true;
-    else
-      options->sync_topics = false;
-  }
-  else if(checkbox_name == "Cloc&k")
-  {
-  	if(clock_checkbox->checkState() == Qt::Checked)
-      options->bag_time = true;
-    else
-      options->bag_time = false;
-  }
+void RvizCntrlPanel::loopCheckbox()
+{
+  if(loop_checkbox->checkState() == Qt::Checked)
+    options->loop = true;
+  else
+    options->loop = false;
 
-	rosbag_player->changeOptions(*options);
+  rosbag_player->changeOptions(*options);
+}
+
+void RvizCntrlPanel::quietCheckbox()
+{
+  if(quiet_checkbox->checkState() == Qt::Checked)
+    options->quiet = true;
+  else
+    options->quiet = false;
+
+  rosbag_player->changeOptions(*options);
+}
+
+void RvizCntrlPanel::syncCheckbox()
+{
+  if(sync_topics_checkbox->checkState() == Qt::Checked)
+    options->sync_topics = true;
+  else
+    options->sync_topics = false;
+
+  rosbag_player->changeOptions(*options);
+}
+
+void RvizCntrlPanel::clockCheckbox()
+{
+  if(clock_checkbox->checkState() == Qt::Checked)
+    options->bag_time = true;
+  else
+    options->bag_time = false;
+
+  rosbag_player->changeOptions(*options);
 }
 
 int RvizCntrlPanel::findBagfiles()
