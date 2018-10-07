@@ -3,6 +3,7 @@
 QLineEdit* id_state_show;
 std::vector<geometry_msgs::Point> selected_points;
 
+std::string msg_frame;
 ros::Time msg_stamp;
 
 void selectionCallback(const roll_test::PointSelection& msg)
@@ -15,6 +16,7 @@ void selectionCallback(const roll_test::PointSelection& msg)
 
 void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
+	msg_frame = msg->header.frame_id;
 	msg_stamp = msg->header.stamp;
 }
 
@@ -109,6 +111,7 @@ void AnnotationPanel::onInitialize()
 {
 	//ROS handling setup
   	selection_sub = nh.subscribe("roll_test/selection_topic", 1, selectionCallback);
+  	//marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 1);
 
   	createTopicList();
 }
@@ -183,8 +186,10 @@ void AnnotationPanel::nameClusterButton()
 
   cluster_name_edit->setVisible(false);
   cluster_name_btn->setVisible(false);
+  cancel_btn->setVisible(false);
+  id_state_show->setText("");
 
-  //aabb around selected points (with marker)
+  /*//aabb around selected points (with marker)
   Eigen::Vector4f centroid;
   Eigen::Vector4f min;
   Eigen::Vector4f max; 
@@ -207,7 +212,51 @@ void AnnotationPanel::nameClusterButton()
   pcl::compute3DCentroid(cloud, centroid);
   pcl::getMinMax3D(cloud, min, max);
 
+  Ogre::Quaternion orientation;
+  Ogre::Vector3 position;
+  vis_manager_->getFrameManager()->getTransform(msg_frame, msg_stamp, position, orientation);
+
   //create marker
+  uint32_t shape = visualization_msgs::Marker::CUBE;
+  visualization_msgs::Marker marker;
+
+  marker.header.frame_id = msg_frame;
+  marker.header.stamp = msg_stamp;
+
+  marker.ns = "class";
+  marker.id = marker_id++;
+  marker.type = shape;
+  marker.action = visualization_msgs::Marker::ADD;
+
+  marker.pose.position.x = centroid[0];
+  marker.pose.position.y = centroid[1];
+  marker.pose.position.z = centroid[2];
+  marker.pose.orientation.x = orientation.x;
+  marker.pose.orientation.y = orientation.y;
+  marker.pose.orientation.z = orientation.z;
+  marker.pose.orientation.w = orientation.w;
+
+  marker.scale.x = max[0] - min[0];
+  marker.scale.y = max[1] - min[1];
+  marker.scale.z = max[2] - min[2];
+
+  if(marker.scale.x == 0)
+  	marker.scale.x = 0.1;
+
+  if(marker.scale.y == 0)
+  	marker.scale.y = 0.1;
+
+  if(marker.scale.z == 0)
+  	marker.scale.z = 0.1;
+
+  marker.color.r = 1.0f;
+  marker.color.g = 1.0f;
+  marker.color.b = 1.0f;
+  marker.color.a = 0.4;
+
+  marker.lifetime = ros::Duration();
+  marker_pub.publish(marker);
+  ros::spinOnce();*/
 }
 
 void AnnotationPanel::joinButton()

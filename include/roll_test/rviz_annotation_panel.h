@@ -6,11 +6,13 @@
 #include <geometry_msgs/Point.h>
 #include <roll_test/PointSelection.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <visualization_msgs/Marker.h>
-#include <pcl/common/centroid.h>
-#include <pcl/common/common.h>
+//#include <visualization_msgs/Marker.h>
+//#include <pcl/common/centroid.h>
+//#include <pcl/common/common.h>
 
 # include <rviz/panel.h>
+//#include <rviz/visualization_manager.h>
+//#include <rviz/frame_manager.h>
 
 #include <stdio.h>
 
@@ -91,6 +93,8 @@ protected:
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
   ros::Subscriber viz_sub;
+  //ros::Publisher marker_pub;
+  //int marker_id = 0;
   // END_TUTORIAL
 };
 
