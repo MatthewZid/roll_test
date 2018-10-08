@@ -37,6 +37,7 @@ namespace roll_test
 // publishing.
 AnnotationPanel::AnnotationPanel( QWidget* parent )
   : rviz::Panel( parent )
+  , marker_id(0)
 {
   //Set GUI
   QHBoxLayout* id_state_layout = new QHBoxLayout;
@@ -111,7 +112,7 @@ void AnnotationPanel::onInitialize()
 {
 	//ROS handling setup
   	selection_sub = nh.subscribe("roll_test/selection_topic", 1, selectionCallback);
-  	//marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+  	marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 1);
 
   	createTopicList();
 }
@@ -151,49 +152,15 @@ void AnnotationPanel::nameClusterButton()
   if(selected_points.empty())
     return;
 
-  std::string homepath = std::getenv("HOME");
-  std::string filename = "annotation.csv";
-  std::string csv_path = homepath + "/Ros_WS/" + filename;
+  PointClass pc;
+  pc.name = cluster_name_edit->text().toStdString();
+  pc.stamp = msg_stamp;
+  pc.topic = cluster_topic_list->currentText().toStdString();
+  pc.points = selected_points;
 
-  std::ofstream csvfile;
-  csvfile.open(csv_path, std::ios::out | std::ios::app);
+  custom_cluster.push_back(pc);
 
-  if(!csvfile.is_open())
-  {
-    ROS_FATAL("%s could not be opened!\n", filename.c_str());
-    ros::shutdown();
-  }
-
-  //write out annotation
-  csvfile << cluster_name_edit->text().toStdString() << "," << msg_stamp << "," << cluster_topic_list->currentText().toStdString();
-  csvfile << ",sensor_msgs/PointCloud2";
-  csvfile << ",[";
-
-  bool first_time = true;
-  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
-  {
-    if(first_time)
-      first_time = false;
-    else
-      csvfile << ",";
-    
-    csvfile << it->x << "," << it->y << "," << it->z;
-  }
-
-  csvfile << "]" << std::endl;
-
-  csvfile.close();
-
-  cluster_name_edit->setVisible(false);
-  cluster_name_btn->setVisible(false);
-  cancel_btn->setVisible(false);
-  id_state_show->setText("");
-
-  /*//aabb around selected points (with marker)
-  Eigen::Vector4f centroid;
-  Eigen::Vector4f min;
-  Eigen::Vector4f max; 
-
+  //aabb around selected points (with marker)
   pcl::PointCloud<pcl::PointXYZ> cloud;
   cloud.width = selected_points.size();
   cloud.height = 1;
@@ -209,12 +176,30 @@ void AnnotationPanel::nameClusterButton()
     cnt++;
   }
 
-  pcl::compute3DCentroid(cloud, centroid);
-  pcl::getMinMax3D(cloud, min, max);
+  //find marker poisition, orientation and scale
+  Eigen::Vector4f centroid;
+  pcl::PointXYZ min;
+  pcl::PointXYZ max;
+  Eigen::Matrix3f covariance;
 
-  Ogre::Quaternion orientation;
-  Ogre::Vector3 position;
-  vis_manager_->getFrameManager()->getTransform(msg_frame, msg_stamp, position, orientation);
+  pcl::compute3DCentroid(cloud, centroid);
+
+  pcl::computeCovarianceMatrixNormalized(cloud, centroid, covariance);
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+  Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
+  eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
+
+  Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
+  p2w.block<3,3>(0,0) = eigDx.transpose();
+  p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
+  pcl::PointCloud<pcl::PointXYZ> cPoints;
+  pcl::transformPointCloud(cloud, cPoints, p2w);
+
+  pcl::getMinMax3D(cPoints, min, max);
+  const Eigen::Vector3f mean_diag = 0.5f*(max.getVector3fMap() + min.getVector3fMap());
+
+  const Eigen::Quaternionf qfinal(eigDx);
+  const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
 
   //create marker
   uint32_t shape = visualization_msgs::Marker::CUBE;
@@ -224,39 +209,51 @@ void AnnotationPanel::nameClusterButton()
   marker.header.stamp = msg_stamp;
 
   marker.ns = "class";
-  marker.id = marker_id++;
+  marker.id = marker_id;
   marker.type = shape;
   marker.action = visualization_msgs::Marker::ADD;
 
-  marker.pose.position.x = centroid[0];
-  marker.pose.position.y = centroid[1];
-  marker.pose.position.z = centroid[2];
-  marker.pose.orientation.x = orientation.x;
-  marker.pose.orientation.y = orientation.y;
-  marker.pose.orientation.z = orientation.z;
-  marker.pose.orientation.w = orientation.w;
+  marker.pose.position.x = tfinal.x();;
+  marker.pose.position.y = tfinal.y();;
+  marker.pose.position.z = tfinal.z();;
+  marker.pose.orientation.x = qfinal.x();
+  marker.pose.orientation.y = qfinal.y();
+  marker.pose.orientation.z = qfinal.z();
+  marker.pose.orientation.w = qfinal.w();
 
-  marker.scale.x = max[0] - min[0];
-  marker.scale.y = max[1] - min[1];
-  marker.scale.z = max[2] - min[2];
+  marker.scale.x = max.x - min.x;
+  marker.scale.y = max.y - min.y;
+  marker.scale.z = max.z - min.z;
 
-  if(marker.scale.x == 0)
-  	marker.scale.x = 0.1;
+  int color_class = marker_id % 3;
 
-  if(marker.scale.y == 0)
-  	marker.scale.y = 0.1;
+  if(color_class == 0){
+  	marker.color.r = 1.0f;
+  	marker.color.g = marker_id % 255;
+  	marker.color.b = marker_id % 255;
+  }
+  if(color_class == 1){
+  	marker.color.r = marker_id % 255;
+  	marker.color.g = 1.0f;
+  	marker.color.b = marker_id % 255;
+  }
+  if(color_class == 2){
+  	marker.color.r = marker_id % 255;
+  	marker.color.g = marker_id % 255;
+  	marker.color.b = 1.0f;
+  }
 
-  if(marker.scale.z == 0)
-  	marker.scale.z = 0.1;
-
-  marker.color.r = 1.0f;
-  marker.color.g = 1.0f;
-  marker.color.b = 1.0f;
   marker.color.a = 0.4;
+  marker_id++;
 
   marker.lifetime = ros::Duration();
   marker_pub.publish(marker);
-  ros::spinOnce();*/
+  ros::spinOnce();
+
+  cluster_name_edit->setVisible(false);
+  cluster_name_btn->setVisible(false);
+  cancel_btn->setVisible(false);
+  id_state_show->setText("");
 }
 
 void AnnotationPanel::joinButton()
@@ -325,20 +322,55 @@ void AnnotationPanel::createTopicList()
 // Save all configuration data from this panel to the given
 // Config object.  It is important here that you call save()
 // on the parent class so the class id and panel name get saved.
-/*void AnnotationPanel::save( rviz::Config config ) const
+void AnnotationPanel::save( rviz::Config config ) const
 {
   rviz::Panel::save( config );
-  config.mapSetValue( "Topic", output_topic_ );
+  //config.mapSetValue( "Topic", cluster_topic_list->currentText() );
+  std::string homepath = std::getenv("HOME");
+  std::string filename = "annotation.csv";
+  std::string csv_path = homepath + "/Ros_WS/" + filename;
+
+  std::ofstream csvfile;
+  csvfile.open(csv_path, std::ios::out | std::ios::app);
+
+  if(!csvfile.is_open())
+  {
+    ROS_FATAL("%s could not be opened!\n", filename.c_str());
+    ros::shutdown();
+  }
+
+  //write out annotation
+  for(auto it=custom_cluster.begin(); it != custom_cluster.end(); it++)
+  {
+    csvfile << it->name << "," << it->stamp << "," << it->topic;
+    csvfile << ",sensor_msgs/PointCloud2";
+    csvfile << ",[";
+ 
+    bool first_time = true;
+    for(auto pit=it->points.begin(); pit != it->points.end(); pit++)
+    {
+      if(first_time)
+        first_time = false;
+      else
+        csvfile << ",";
+    
+      csvfile << pit->x << "," << pit->y << "," << pit->z;
+    }
+
+    csvfile << "]" << std::endl;
+  }
+
+  csvfile.close();
 }
 
 // Load all configuration data for this panel from the given Config object.
-void AnnotationPanel::load( const rviz::Config& config )
+/*void AnnotationPanel::load( const rviz::Config& config )
 {
   rviz::Panel::load( config );
   QString topic;
   if( config.mapGetString( "Topic", &topic ))
   {
-    output_topic_editor_->setText( topic );
+    cluster_topic_list->setText( topic );
     updateTopic();
   }
 }*/

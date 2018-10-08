@@ -6,13 +6,12 @@
 #include <geometry_msgs/Point.h>
 #include <roll_test/PointSelection.h>
 #include <sensor_msgs/PointCloud2.h>
-//#include <visualization_msgs/Marker.h>
-//#include <pcl/common/centroid.h>
-//#include <pcl/common/common.h>
+#include <visualization_msgs/Marker.h>
+#include <pcl/common/centroid.h>
+#include <pcl/common/common.h>
+#include <pcl/common/transforms.h>
 
 # include <rviz/panel.h>
-//#include <rviz/visualization_manager.h>
-//#include <rviz/frame_manager.h>
 
 #include <stdio.h>
 
@@ -32,6 +31,14 @@ class QLineEdit;
 
 namespace roll_test
 {
+
+typedef struct pointClass
+{
+  std::string name;
+  ros::Time stamp;
+  std::string topic;
+  std::vector<geometry_msgs::Point> points;
+}PointClass;
 // BEGIN_TUTORIAL
 // Here we declare our new subclass of rviz::Panel.  Every panel which
 // can be added via the Panels/Add_New_Panel menu is a subclass of
@@ -61,7 +68,7 @@ public:
   // loading data from the config file.  Here the data is the
   // topic name.
   // virtual void load( const rviz::Config& config );
-  // virtual void save( rviz::Config config ) const;
+   virtual void save( rviz::Config config ) const;
 
   // Next come a couple of public Qt slots.
 public Q_SLOTS:
@@ -93,8 +100,11 @@ protected:
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
   ros::Subscriber viz_sub;
-  //ros::Publisher marker_pub;
-  //int marker_id = 0;
+  ros::Publisher marker_pub;
+
+  std::vector<PointClass> custom_cluster;
+
+  int marker_id;
   // END_TUTORIAL
 };
 
