@@ -37,6 +37,7 @@ typedef struct pointClass
   std::string name;
   ros::Time stamp;
   std::string topic;
+  std::string type;
   std::vector<geometry_msgs::Point> points;
 }PointClass;
 // BEGIN_TUTORIAL
@@ -67,7 +68,7 @@ public:
   // Now we declare overrides of rviz::Panel functions for saving and
   // loading data from the config file.  Here the data is the
   // topic name.
-  // virtual void load( const rviz::Config& config );
+   virtual void load( const rviz::Config& config );
    virtual void save( rviz::Config config ) const;
 
   // Next come a couple of public Qt slots.

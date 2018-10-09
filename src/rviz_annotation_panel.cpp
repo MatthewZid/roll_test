@@ -156,6 +156,7 @@ void AnnotationPanel::nameClusterButton()
   pc.name = cluster_name_edit->text().toStdString();
   pc.stamp = msg_stamp;
   pc.topic = cluster_topic_list->currentText().toStdString();
+  pc.type = "sensor_msgs/PointCloud2";
   pc.points = selected_points;
 
   custom_cluster.push_back(pc);
@@ -342,8 +343,7 @@ void AnnotationPanel::save( rviz::Config config ) const
   //write out annotation
   for(auto it=custom_cluster.begin(); it != custom_cluster.end(); it++)
   {
-    csvfile << it->name << "," << it->stamp << "," << it->topic;
-    csvfile << ",sensor_msgs/PointCloud2";
+    csvfile << it->name << "," << it->stamp.toSec() << "," << it->topic << "," << it->type;
     csvfile << ",[";
  
     bool first_time = true;
@@ -364,16 +364,39 @@ void AnnotationPanel::save( rviz::Config config ) const
 }
 
 // Load all configuration data for this panel from the given Config object.
-/*void AnnotationPanel::load( const rviz::Config& config )
+void AnnotationPanel::load( const rviz::Config& config )
 {
   rviz::Panel::load( config );
-  QString topic;
+  /*QString topic;
   if( config.mapGetString( "Topic", &topic ))
   {
     cluster_topic_list->setText( topic );
     updateTopic();
+  }*/
+
+  std::string homepath = std::getenv("HOME");
+  std::string filename = "annotation.csv";
+  std::string csv_path = homepath + "/Ros_WS/" + filename;
+
+  std::ifstream csvfile(csv_path);
+
+  if(!csvfile.is_open())
+  {
+    ROS_FATAL("%s could not be opened!\n", filename.c_str());
+    ros::shutdown();
   }
-}*/
+
+  //read annotation fields
+  std::string line;
+
+  while(std::getline(csvfile, line))
+  {
+  	PointClass pc;
+  	//parse csv
+  }
+
+  csvfile.close();
+}
 
 } // end namespace rviz_plugin_tutorials
 
