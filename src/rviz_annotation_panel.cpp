@@ -6,6 +6,8 @@ std::vector<geometry_msgs::Point> selected_points;
 std::string msg_frame;
 ros::Time msg_stamp;
 
+std::vector<roll_test::PointClass> custom_cluster;
+
 void selectionCallback(const roll_test::PointSelection& msg)
 {
   selected_points.clear();
@@ -18,6 +20,11 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
 	msg_frame = msg->header.frame_id;
 	msg_stamp = msg->header.stamp;
+
+	if(custom_cluster.empty())
+		return;
+
+	//convert pc2 to pc and republish annotated pc2 message to seperate pc2 topic
 }
 
 namespace roll_test
@@ -354,25 +361,29 @@ void AnnotationPanel::save( rviz::Config config ) const
       else
         csvfile << ",";
     
-      csvfile << pit->x << "," << pit->y << "," << pit->z;
+      csvfile << "(" << pit->x << "," << pit->y << "," << pit->z << ")";
     }
 
     csvfile << "]" << std::endl;
   }
 
   csvfile.close();
+
+  ROS_INFO("Annotation saved\n");
 }
 
 // Load all configuration data for this panel from the given Config object.
 void AnnotationPanel::load( const rviz::Config& config )
 {
   rviz::Panel::load( config );
-  /*QString topic;
-  if( config.mapGetString( "Topic", &topic ))
-  {
-    cluster_topic_list->setText( topic );
-    updateTopic();
-  }*/
+  // QString topic;
+  // if( config.mapGetString( "Topic", &topic ))
+  // {
+  //   cluster_topic_list->setText( topic );
+  //   updateTopic();
+  // }
+
+  ROS_INFO("Loading csv...\n");
 
   std::string homepath = std::getenv("HOME");
   std::string filename = "annotation.csv";
@@ -383,7 +394,7 @@ void AnnotationPanel::load( const rviz::Config& config )
   if(!csvfile.is_open())
   {
     ROS_FATAL("%s could not be opened!\n", filename.c_str());
-    ros::shutdown();
+    return;
   }
 
   //read annotation fields
@@ -392,10 +403,58 @@ void AnnotationPanel::load( const rviz::Config& config )
   while(std::getline(csvfile, line))
   {
   	PointClass pc;
-  	//parse csv
+  	std::istringstream lss(line);
+
+  	std::getline(lss, line, ',');
+  	pc.name = line;
+
+  	double tm;
+  	std::getline(lss, line, ',');
+  	std::istringstream(line) >> tm;
+  	pc.stamp.fromSec(tm);
+
+  	std::getline(lss, line, ',');
+  	pc.topic = line;
+
+  	std::getline(lss, line, ',');
+  	pc.type = line;
+
+  	std::getline(lss, line);
+  	std::smatch m;
+  	std::regex reg("([\\w,\\w,\\w]([^\\(|\\)|\\])]*))([^,|\\(|\\)])");	//pattern: find x,y,z in list [(x,y,z),...]
+  	std::vector<geometry_msgs::Point> pvec;
+
+  	while(std::regex_search(line, m, reg)){
+  		std::istringstream pss(m[0]);
+  		std::string num;
+  		geometry_msgs::Point point;
+
+  		double pt;
+  		std::getline(pss, num, ',');
+  		std::istringstream(num) >> pt;
+  		point.x = pt;
+
+  		std::getline(pss, num, ',');
+  		std::istringstream(num) >> pt;
+  		point.y = pt;
+
+  		std::getline(pss, num, ',');
+  		std::istringstream(num) >> pt;
+  		point.z = pt;
+
+  		pvec.push_back(point);
+
+		line = m.suffix().str();
+	}
+
+	pc.points = pvec;
+
+	custom_cluster.push_back(pc);
   }
 
   csvfile.close();
+
+  ROS_INFO("Successful csv loading\n");
 }
 
 } // end namespace rviz_plugin_tutorials

@@ -25,6 +25,7 @@
 #include <QComboBox>
 
 #include <fstream>
+#include <regex>
 #endif
 
 class QLineEdit;
@@ -102,8 +103,6 @@ protected:
   ros::Subscriber selection_sub;
   ros::Subscriber viz_sub;
   ros::Publisher marker_pub;
-
-  std::vector<PointClass> custom_cluster;
 
   int marker_id;
   // END_TUTORIAL
