@@ -6,6 +6,9 @@ std::vector<geometry_msgs::Point> selected_points;
 std::string msg_frame;
 ros::Time msg_stamp;
 
+int marker_id = 0;
+ros::Publisher marker_pub;
+visualization_msgs::MarkerArray marker_array;
 std::vector<roll_test::PointClass> custom_cluster;
 
 void selectionCallback(const roll_test::PointSelection& msg)
@@ -21,10 +24,24 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 	msg_frame = msg->header.frame_id;
 	msg_stamp = msg->header.stamp;
 
-	if(custom_cluster.empty())
-		return;
+  marker_array.markers.clear();
 
-	//convert pc2 to pc and republish annotated pc2 message to seperate pc2 topic
+	if(custom_cluster.empty()){
+    visualization_msgs::Marker marker;
+
+    marker.color.a = 0.0;
+    marker_array.markers.push_back(marker);
+    marker_pub.publish(marker_array);
+		return;
+  }
+
+  for(int i=0; i < custom_cluster.size(); i++)
+  {
+    if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
+      continue;
+
+    publishMarkers(custom_cluster[i].points);
+  }
 }
 
 namespace roll_test
@@ -44,7 +61,6 @@ namespace roll_test
 // publishing.
 AnnotationPanel::AnnotationPanel( QWidget* parent )
   : rviz::Panel( parent )
-  , marker_id(0)
 {
   //Set GUI
   QHBoxLayout* id_state_layout = new QHBoxLayout;
@@ -119,7 +135,7 @@ void AnnotationPanel::onInitialize()
 {
 	//ROS handling setup
   	selection_sub = nh.subscribe("roll_test/selection_topic", 1, selectionCallback);
-  	marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+  	marker_pub = nh.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 
   	createTopicList();
 }
@@ -168,95 +184,7 @@ void AnnotationPanel::nameClusterButton()
 
   custom_cluster.push_back(pc);
 
-  //aabb around selected points (with marker)
-  pcl::PointCloud<pcl::PointXYZ> cloud;
-  cloud.width = selected_points.size();
-  cloud.height = 1;
-  cloud.is_dense = false;
-  cloud.points.resize(cloud.width * cloud.height);
-
-  int cnt = 0;
-  for(auto it=selected_points.begin(); it != selected_points.end(); it++)
-  {
-    cloud.points[cnt].x = it->x;
-    cloud.points[cnt].y = it->y;
-    cloud.points[cnt].z = it->z;
-    cnt++;
-  }
-
-  //find marker poisition, orientation and scale
-  Eigen::Vector4f centroid;
-  pcl::PointXYZ min;
-  pcl::PointXYZ max;
-  Eigen::Matrix3f covariance;
-
-  pcl::compute3DCentroid(cloud, centroid);
-
-  pcl::computeCovarianceMatrixNormalized(cloud, centroid, covariance);
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-  Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
-  eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
-
-  Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
-  p2w.block<3,3>(0,0) = eigDx.transpose();
-  p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
-  pcl::PointCloud<pcl::PointXYZ> cPoints;
-  pcl::transformPointCloud(cloud, cPoints, p2w);
-
-  pcl::getMinMax3D(cPoints, min, max);
-  const Eigen::Vector3f mean_diag = 0.5f*(max.getVector3fMap() + min.getVector3fMap());
-
-  const Eigen::Quaternionf qfinal(eigDx);
-  const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
-
-  //create marker
-  uint32_t shape = visualization_msgs::Marker::CUBE;
-  visualization_msgs::Marker marker;
-
-  marker.header.frame_id = msg_frame;
-  marker.header.stamp = msg_stamp;
-
-  marker.ns = "class";
-  marker.id = marker_id;
-  marker.type = shape;
-  marker.action = visualization_msgs::Marker::ADD;
-
-  marker.pose.position.x = tfinal.x();;
-  marker.pose.position.y = tfinal.y();;
-  marker.pose.position.z = tfinal.z();;
-  marker.pose.orientation.x = qfinal.x();
-  marker.pose.orientation.y = qfinal.y();
-  marker.pose.orientation.z = qfinal.z();
-  marker.pose.orientation.w = qfinal.w();
-
-  marker.scale.x = max.x - min.x;
-  marker.scale.y = max.y - min.y;
-  marker.scale.z = max.z - min.z;
-
-  int color_class = marker_id % 3;
-
-  if(color_class == 0){
-  	marker.color.r = 1.0f;
-  	marker.color.g = marker_id % 255;
-  	marker.color.b = marker_id % 255;
-  }
-  if(color_class == 1){
-  	marker.color.r = marker_id % 255;
-  	marker.color.g = 1.0f;
-  	marker.color.b = marker_id % 255;
-  }
-  if(color_class == 2){
-  	marker.color.r = marker_id % 255;
-  	marker.color.g = marker_id % 255;
-  	marker.color.b = 1.0f;
-  }
-
-  marker.color.a = 0.4;
-  marker_id++;
-
-  marker.lifetime = ros::Duration();
-  marker_pub.publish(marker);
-  ros::spinOnce();
+  publishMarkers(selected_points);
 
   cluster_name_edit->setVisible(false);
   cluster_name_btn->setVisible(false);
@@ -327,6 +255,101 @@ void AnnotationPanel::createTopicList()
 	}
 }
 
+void publishMarkers(const std::vector<geometry_msgs::Point>& points_vec)
+{
+  //aabb around selected points (with marker)
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  cloud.width = points_vec.size();
+  cloud.height = 1;
+  cloud.is_dense = false;
+  cloud.points.resize(cloud.width * cloud.height);
+
+  int cnt = 0;
+  for(auto it=points_vec.begin(); it != points_vec.end(); it++)
+  {
+    cloud.points[cnt].x = it->x;
+    cloud.points[cnt].y = it->y;
+    cloud.points[cnt].z = it->z;
+    cnt++;
+  }
+
+  //find marker poisition, orientation and scale
+  Eigen::Vector4f centroid;
+  pcl::PointXYZ min;
+  pcl::PointXYZ max;
+  Eigen::Matrix3f covariance;
+
+  pcl::compute3DCentroid(cloud, centroid);
+
+  pcl::computeCovarianceMatrixNormalized(cloud, centroid, covariance);
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+  Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
+  eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
+
+  Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
+  p2w.block<3,3>(0,0) = eigDx.transpose();
+  p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
+  pcl::PointCloud<pcl::PointXYZ> cPoints;
+  pcl::transformPointCloud(cloud, cPoints, p2w);
+
+  pcl::getMinMax3D(cPoints, min, max);
+  const Eigen::Vector3f mean_diag = 0.5f*(max.getVector3fMap() + min.getVector3fMap());
+
+  const Eigen::Quaternionf qfinal(eigDx);
+  const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
+
+  //create marker
+  uint32_t shape = visualization_msgs::Marker::CUBE;
+  visualization_msgs::Marker marker;
+
+  marker.header.frame_id = msg_frame;
+  marker.header.stamp = msg_stamp;
+
+  marker.ns = "class";
+  marker.id = marker_id++;
+  marker.type = shape;
+  marker.action = visualization_msgs::Marker::ADD;
+
+  marker.pose.position.x = tfinal.x();;
+  marker.pose.position.y = tfinal.y();;
+  marker.pose.position.z = tfinal.z();;
+  marker.pose.orientation.x = qfinal.x();
+  marker.pose.orientation.y = qfinal.y();
+  marker.pose.orientation.z = qfinal.z();
+  marker.pose.orientation.w = qfinal.w();
+
+  marker.scale.x = max.x - min.x;
+  marker.scale.y = max.y - min.y;
+  marker.scale.z = max.z - min.z;
+
+  int color_class = marker_id % 3;
+
+  if(color_class == 0){
+    marker.color.r = 1.0f;
+    marker.color.g = marker_id % 255;
+    marker.color.b = marker_id % 255;
+  }
+  if(color_class == 1){
+    marker.color.r = marker_id % 255;
+    marker.color.g = 1.0f;
+    marker.color.b = marker_id % 255;
+  }
+  if(color_class == 2){
+    marker.color.r = marker_id % 255;
+    marker.color.g = marker_id % 255;
+    marker.color.b = 1.0f;
+  }
+
+  marker.color.a = 0.4;
+
+  marker.lifetime = ros::Duration();
+
+  marker_array.markers.push_back(marker);
+
+  marker_pub.publish(marker_array);
+  ros::spinOnce();
+}
+
 // Save all configuration data from this panel to the given
 // Config object.  It is important here that you call save()
 // on the parent class so the class id and panel name get saved.
@@ -334,6 +357,10 @@ void AnnotationPanel::save( rviz::Config config ) const
 {
   rviz::Panel::save( config );
   //config.mapSetValue( "Topic", cluster_topic_list->currentText() );
+
+  if(custom_cluster.empty())
+    return;
+
   std::string homepath = std::getenv("HOME");
   std::string filename = "annotation.csv";
   std::string csv_path = homepath + "/Ros_WS/" + filename;
@@ -369,7 +396,7 @@ void AnnotationPanel::save( rviz::Config config ) const
 
   csvfile.close();
 
-  ROS_INFO("Annotation saved\n");
+  ROS_INFO("Annotation saved to: %s\n", filename.c_str());
 }
 
 // Load all configuration data for this panel from the given Config object.
@@ -393,7 +420,7 @@ void AnnotationPanel::load( const rviz::Config& config )
 
   if(!csvfile.is_open())
   {
-    ROS_FATAL("%s could not be opened!\n", filename.c_str());
+    ROS_WARN("%s could not be opened!\n", filename.c_str());
     return;
   }
 

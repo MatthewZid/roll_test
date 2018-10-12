@@ -7,6 +7,7 @@
 #include <roll_test/PointSelection.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <pcl/common/centroid.h>
 #include <pcl/common/common.h>
 #include <pcl/common/transforms.h>
@@ -29,6 +30,8 @@
 #endif
 
 class QLineEdit;
+
+void publishMarkers(const std::vector<geometry_msgs::Point>& points_vec);
 
 namespace roll_test
 {
@@ -102,9 +105,6 @@ protected:
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
   ros::Subscriber viz_sub;
-  ros::Publisher marker_pub;
-
-  int marker_id;
   // END_TUTORIAL
 };
 
