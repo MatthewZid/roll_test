@@ -31,7 +31,7 @@
 
 class QLineEdit;
 
-void publishMarkers(const std::vector<geometry_msgs::Point>& points_vec);
+void insertMarker(const std::vector<geometry_msgs::Point>& points_vec);
 
 namespace roll_test
 {
@@ -90,12 +90,14 @@ public Q_SLOTS:
 
 private:
   void createTopicList();
+  void createNameList();
+  void divideAction();
 
   // Then we finish up with protected member variables.
 protected:
   QPushButton *cluster_name_btn;
   QPushButton *cluster_join_btn;
-  QLineEdit* cluster_name_edit;
+  QComboBox* cluster_name_edit;
   QComboBox* cluster_topic_list;
   QPushButton *refresh_btn;
   QPushButton *divide_btn;
@@ -105,6 +107,8 @@ protected:
   ros::NodeHandle nh;
   ros::Subscriber selection_sub;
   ros::Subscriber viz_sub;
+
+  int button_id;
   // END_TUTORIAL
 };
 

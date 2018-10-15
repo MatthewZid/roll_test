@@ -24,238 +24,35 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 	msg_frame = msg->header.frame_id;
 	msg_stamp = msg->header.stamp;
 
-  marker_array.markers.clear();
+   	marker_array.markers.clear();
 
-	if(custom_cluster.empty()){
-    visualization_msgs::Marker marker;
+	visualization_msgs::Marker marker;
+
+	marker.header.frame_id = msg->header.frame_id;
+	marker.header.stamp = msg->header.stamp;
+
+	marker.ns = "clear_markers";
+	marker.id = 0;
+
+	marker.action = visualization_msgs::Marker::DELETEALL;
 
     marker.color.a = 0.0;
     marker_array.markers.push_back(marker);
     marker_pub.publish(marker_array);
-		return;
-  }
 
-  for(int i=0; i < custom_cluster.size(); i++)
-  {
-    if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
-      continue;
+  	for(int i=0; i < custom_cluster.size(); i++)
+  	{
+    	if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
+      		continue;
 
-    publishMarkers(custom_cluster[i].points);
-  }
+    	insertMarker(custom_cluster[i].points);
+  	}
+
+  	marker_pub.publish(marker_array);
+  	ros::spinOnce();
 }
 
-namespace roll_test
-{
-
-// BEGIN_TUTORIAL
-// Here is the implementation of the AnnotationPanel class.  AnnotationPanel
-// has these responsibilities:
-//
-// - Act as a container for GUI elements DriveWidget and QLineEdit.
-// - Publish command velocities 10 times per second (whether 0 or not).
-// - Saving and restoring internal state from a config file.
-//
-// We start with the constructor, doing the standard Qt thing of
-// passing the optional *parent* argument on to the superclass
-// constructor, and also zero-ing the velocities we will be
-// publishing.
-AnnotationPanel::AnnotationPanel( QWidget* parent )
-  : rviz::Panel( parent )
-{
-  //Set GUI
-  QHBoxLayout* id_state_layout = new QHBoxLayout;
-  id_state_layout->addWidget(new QLabel("Selection id state:"));
-  id_state_show = new QLineEdit;
-  id_state_show->setText("");
-  id_state_show->setPlaceholderText("No received state");
-  id_state_show->setFrame(false);
-  id_state_show->setReadOnly(true);
-  id_state_layout->addWidget(id_state_show);
-
-  QGridLayout* cluster_mngment_layout = new QGridLayout;
-  cluster_mngment_layout->addWidget(new QLabel("Selection:"), 0, 0, 1, 1);
-  cluster_join_btn = new QPushButton(tr("Join"));
-  cluster_mngment_layout->addWidget(cluster_join_btn, 0, 1, 1, 1);
-  cluster_join_btn->setEnabled(false);
-  cluster_mngment_layout->addWidget(new QLabel(" or "), 0, 2, 1, 1);
-  divide_btn = new QPushButton(tr("Divide"));
-  cluster_mngment_layout->setColumnStretch(3, 1);
-  cluster_mngment_layout->setColumnStretch(4, 1);
-  cluster_mngment_layout->addWidget(divide_btn, 0, 3, 1, 1);
-  divide_btn->setEnabled(false);
-
-  QHBoxLayout* cluster_name_layout = new QHBoxLayout;
-  cluster_name_edit = new QLineEdit;
-  cluster_name_edit->setPlaceholderText("Enter name");
-  cluster_name_edit->setVisible(false);
-  cluster_name_layout->addWidget(cluster_name_edit);
-  cluster_name_btn = new QPushButton("Name cluster");
-  cluster_name_btn->setVisible(false);
-  cluster_name_layout->addWidget(cluster_name_btn);
-
-  QHBoxLayout* topic_list_layout = new QHBoxLayout;
-  topic_list_layout->addWidget(new QLabel("Topic list:"));
-  cluster_topic_list = new QComboBox;
-  cluster_topic_list->setEditable(true);
-  topic_list_layout->addWidget(cluster_topic_list);
-  refresh_btn = new QPushButton("Refresh");
-  topic_list_layout->addWidget(refresh_btn);
-
-  QVBoxLayout* cluster_name_main_layout = new QVBoxLayout;
-  cluster_name_main_layout->addLayout(cluster_mngment_layout);
-  cluster_name_main_layout->addLayout(cluster_name_layout);
-  cancel_btn = new QPushButton("Cancel naming");
-  cancel_btn->setVisible(false);
-  cluster_name_main_layout->addWidget(cancel_btn);
-  cluster_name_main_layout->addLayout(topic_list_layout);
-
-  QGroupBox* cluster_id_group = new QGroupBox("Cluster state");
-  cluster_id_group->setLayout(id_state_layout);
-
-  QGroupBox* cluster_name_group = new QGroupBox("Cluster management");
-  cluster_name_group->setLayout(cluster_name_main_layout);
-
-  QVBoxLayout* main_layout = new QVBoxLayout;
-  main_layout->addWidget(cluster_id_group);
-  main_layout->addWidget(cluster_name_group);
-
-  setLayout(main_layout);
-
-  // Next we make signal/slot connections.
-  connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
-  connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(nameClusterButton()));
-  connect(cluster_join_btn, SIGNAL( released() ), this, SLOT(joinButton()));
-  connect(divide_btn, SIGNAL( released() ), this, SLOT(divideButton()));
-  connect(cancel_btn, SIGNAL( released() ), this, SLOT(cancelButton()));
-  connect(refresh_btn, SIGNAL(released()), this, SLOT(refreshAction()));
-  connect(cluster_topic_list, SIGNAL(currentIndexChanged(const QString&)), this, SLOT(topicSelect(const QString&)));
-}
-
-void AnnotationPanel::onInitialize()
-{
-	//ROS handling setup
-  	selection_sub = nh.subscribe("roll_test/selection_topic", 1, selectionCallback);
-  	marker_pub = nh.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
-
-  	createTopicList();
-}
-
-void AnnotationPanel::topicSelect(const QString& txt)
-{
-	std::string current_topic = viz_sub.getTopic();
-
-	if(txt.toStdString() == current_topic)
-		return;
-
-	viz_sub.shutdown();
-
-	if(cluster_topic_list->count() > 0){
-		viz_sub = nh.subscribe(txt.toStdString(), 1, vizCallback);
-		ROS_INFO("Subscribed to topic: %s\n", txt.toStdString().c_str());
-	}
-}
-
-void AnnotationPanel::handleTxtChanged()
-{
-  if(id_state_show->text().toStdString() == ""){
-    cluster_join_btn->setEnabled(false);
-    divide_btn->setEnabled(false);
-  }
-  else{
-    cluster_join_btn->setEnabled(true);
-    divide_btn->setEnabled(true);
-
-    if(id_state_show->text().toStdString() != "Clean cluster")
-      ROS_WARN("Annotation panel: Multiple id's detected in selection.\nIf points belong to different objects, they need manual re-clustering\n");
-  }
-}
-
-void AnnotationPanel::nameClusterButton()
-{
-  if(selected_points.empty())
-    return;
-
-  PointClass pc;
-  pc.name = cluster_name_edit->text().toStdString();
-  pc.stamp = msg_stamp;
-  pc.topic = cluster_topic_list->currentText().toStdString();
-  pc.type = "sensor_msgs/PointCloud2";
-  pc.points = selected_points;
-
-  custom_cluster.push_back(pc);
-
-  publishMarkers(selected_points);
-
-  cluster_name_edit->setVisible(false);
-  cluster_name_btn->setVisible(false);
-  cancel_btn->setVisible(false);
-  id_state_show->setText("");
-}
-
-void AnnotationPanel::joinButton()
-{
-  cluster_name_edit->setVisible(true);
-  cluster_name_btn->setVisible(true);
-  cancel_btn->setVisible(true);
-  cluster_join_btn->setEnabled(false);
-  divide_btn->setEnabled(false);
-}
-
-void AnnotationPanel::divideButton()
-{
-  cluster_join_btn->setEnabled(false);
-  divide_btn->setEnabled(false);
-}
-
-void AnnotationPanel::cancelButton()
-{
-  cluster_name_edit->setVisible(false);
-  cluster_name_btn->setVisible(false);
-  cancel_btn->setVisible(false);
-  cluster_join_btn->setEnabled(true);
-  divide_btn->setEnabled(true);
-}
-
-void AnnotationPanel::refreshAction()
-{
-	for(int i=0; i < cluster_topic_list->count(); i++)
-		cluster_topic_list->removeItem(i);
-
-	createTopicList();
-
-	ROS_INFO("Topic list refreshed\n");
-}
-
-void AnnotationPanel::createTopicList()
-{
-	int topic_index = 0;
-	ros::master::V_TopicInfo master_topics;
-	ros::master::getTopics(master_topics);
-
-	for(auto it = master_topics.begin(); it != master_topics.end(); it++)
-	{
-		const ros::master::TopicInfo& info = *it;
-
-		if(info.datatype.find("sensor_msgs/PointCloud2") != std::string::npos)
-			cluster_topic_list->insertItem(topic_index++, QString(info.name.c_str()));
-	}
-
-	std::string current_topic = viz_sub.getTopic();
-	std::string current_list = cluster_topic_list->currentText().toStdString();
-
-	if(current_list == current_topic)
-		return;
-
-	viz_sub.shutdown();
-
-	if(cluster_topic_list->count() > 0){
-		cluster_topic_list->setCurrentIndex(0);
-		viz_sub = nh.subscribe(cluster_topic_list->currentText().toStdString(), 1, vizCallback);
-		ROS_INFO("Subscribed to topic: %s\n", cluster_topic_list->currentText().toStdString().c_str());
-	}
-}
-
-void publishMarkers(const std::vector<geometry_msgs::Point>& points_vec)
+void insertMarker(const std::vector<geometry_msgs::Point>& points_vec)
 {
   //aabb around selected points (with marker)
   pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -322,6 +119,15 @@ void publishMarkers(const std::vector<geometry_msgs::Point>& points_vec)
   marker.scale.y = max.y - min.y;
   marker.scale.z = max.z - min.z;
 
+  if(marker.scale.x == 0.0)
+  	marker.scale.x = 0.1;
+
+  if(marker.scale.y == 0.0)
+  	marker.scale.y = 0.1;
+
+  if(marker.scale.z == 0.0)
+  	marker.scale.z = 0.1;
+
   int color_class = marker_id % 3;
 
   if(color_class == 0){
@@ -345,9 +151,303 @@ void publishMarkers(const std::vector<geometry_msgs::Point>& points_vec)
   marker.lifetime = ros::Duration();
 
   marker_array.markers.push_back(marker);
+}
+
+namespace roll_test
+{
+
+// BEGIN_TUTORIAL
+// Here is the implementation of the AnnotationPanel class.  AnnotationPanel
+// has these responsibilities:
+//
+// - Act as a container for GUI elements DriveWidget and QLineEdit.
+// - Publish command velocities 10 times per second (whether 0 or not).
+// - Saving and restoring internal state from a config file.
+//
+// We start with the constructor, doing the standard Qt thing of
+// passing the optional *parent* argument on to the superclass
+// constructor, and also zero-ing the velocities we will be
+// publishing.
+AnnotationPanel::AnnotationPanel( QWidget* parent )
+  : rviz::Panel( parent )
+{
+  //Set GUI
+  QHBoxLayout* id_state_layout = new QHBoxLayout;
+  id_state_layout->addWidget(new QLabel("Selection id state:"));
+  id_state_show = new QLineEdit;
+  id_state_show->setText("");
+  id_state_show->setPlaceholderText("No received state");
+  id_state_show->setFrame(false);
+  id_state_show->setReadOnly(true);
+  id_state_layout->addWidget(id_state_show);
+
+  QGridLayout* cluster_mngment_layout = new QGridLayout;
+  cluster_mngment_layout->addWidget(new QLabel("Selection:"), 0, 0, 1, 1);
+  cluster_join_btn = new QPushButton(tr("Join"));
+  cluster_mngment_layout->addWidget(cluster_join_btn, 0, 1, 1, 1);
+  cluster_join_btn->setEnabled(false);
+  cluster_mngment_layout->addWidget(new QLabel(" or "), 0, 2, 1, 1);
+  divide_btn = new QPushButton(tr("Divide"));
+  cluster_mngment_layout->setColumnStretch(3, 1);
+  cluster_mngment_layout->setColumnStretch(4, 1);
+  cluster_mngment_layout->addWidget(divide_btn, 0, 3, 1, 1);
+  divide_btn->setEnabled(false);
+
+  QHBoxLayout* cluster_name_layout = new QHBoxLayout;
+  cluster_name_edit = new QComboBox;
+  cluster_name_edit->setEditable(true);
+  cluster_name_edit->setVisible(false);
+  cluster_name_layout->addWidget(cluster_name_edit);
+  cluster_name_btn = new QPushButton("Name cluster");
+  cluster_name_btn->setVisible(false);
+  cluster_name_layout->addWidget(cluster_name_btn);
+
+  QHBoxLayout* topic_list_layout = new QHBoxLayout;
+  topic_list_layout->addWidget(new QLabel("Topic list:"));
+  cluster_topic_list = new QComboBox;
+  cluster_topic_list->setEditable(true);
+  topic_list_layout->addWidget(cluster_topic_list);
+  refresh_btn = new QPushButton("Refresh");
+  topic_list_layout->addWidget(refresh_btn);
+
+  QVBoxLayout* cluster_name_main_layout = new QVBoxLayout;
+  cluster_name_main_layout->addLayout(cluster_mngment_layout);
+  cluster_name_main_layout->addLayout(cluster_name_layout);
+  cancel_btn = new QPushButton("Cancel naming");
+  cancel_btn->setVisible(false);
+  cluster_name_main_layout->addWidget(cancel_btn);
+  cluster_name_main_layout->addLayout(topic_list_layout);
+
+  QGroupBox* cluster_id_group = new QGroupBox("Cluster state");
+  cluster_id_group->setLayout(id_state_layout);
+
+  QGroupBox* cluster_name_group = new QGroupBox("Cluster management");
+  cluster_name_group->setLayout(cluster_name_main_layout);
+
+  QVBoxLayout* main_layout = new QVBoxLayout;
+  main_layout->addWidget(cluster_id_group);
+  main_layout->addWidget(cluster_name_group);
+
+  setLayout(main_layout);
+
+  // Next we make signal/slot connections.
+  connect(id_state_show, SIGNAL(textChanged(QString)), this, SLOT(handleTxtChanged()));
+  connect(cluster_name_btn, SIGNAL( released() ), this, SLOT(nameClusterButton()));
+  connect(cluster_join_btn, SIGNAL( released() ), this, SLOT(joinButton()));
+  connect(divide_btn, SIGNAL( released() ), this, SLOT(divideButton()));
+  connect(cancel_btn, SIGNAL( released() ), this, SLOT(cancelButton()));
+  connect(refresh_btn, SIGNAL(released()), this, SLOT(refreshAction()));
+  connect(cluster_topic_list, SIGNAL(currentIndexChanged(const QString&)), this, SLOT(topicSelect(const QString&)));
+}
+
+void AnnotationPanel::onInitialize()
+{
+	//ROS handling setup
+  	selection_sub = nh.subscribe("roll_test/selection_topic", 1, selectionCallback);
+  	marker_pub = nh.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
+
+  	createTopicList();
+  	createNameList();
+}
+
+void AnnotationPanel::topicSelect(const QString& txt)
+{
+	std::string current_topic = viz_sub.getTopic();
+
+	if(txt.toStdString() == current_topic)
+		return;
+
+	viz_sub.shutdown();
+
+	if(cluster_topic_list->count() > 0){
+		viz_sub = nh.subscribe(txt.toStdString(), 1, vizCallback);
+		ROS_INFO("Subscribed to topic: %s\n", txt.toStdString().c_str());
+	}
+}
+
+void AnnotationPanel::handleTxtChanged()
+{
+  if(id_state_show->text().toStdString() == ""){
+    cluster_join_btn->setEnabled(false);
+    divide_btn->setEnabled(false);
+  }
+  else{
+    cluster_join_btn->setEnabled(true);
+    divide_btn->setEnabled(true);
+
+    if(id_state_show->text().toStdString() != "Clean cluster")
+      ROS_WARN("Annotation panel: Multiple id's detected in selection.\nIf points belong to different objects, they need manual re-clustering\n");
+  }
+}
+
+void AnnotationPanel::nameClusterButton()
+{
+  if(selected_points.empty())
+    return;
+
+  if(cluster_name_edit->currentText().toStdString() == ""){
+  	ROS_WARN("You must specify class name!\n");
+  	return;
+  }
+
+  if(button_id == 2)
+  {
+  	divideAction();
+  	return;
+  }
+
+  PointClass pc;
+  pc.name = cluster_name_edit->currentText().toStdString();
+  pc.stamp = msg_stamp;
+  pc.topic = cluster_topic_list->currentText().toStdString();
+  pc.type = "sensor_msgs/PointCloud2";
+  pc.points = selected_points;
+
+  custom_cluster.push_back(pc);
+
+  insertMarker(selected_points);
 
   marker_pub.publish(marker_array);
   ros::spinOnce();
+
+  cluster_name_edit->setVisible(false);
+  cluster_name_btn->setVisible(false);
+  cancel_btn->setVisible(false);
+  id_state_show->setText("");
+}
+
+void AnnotationPanel::joinButton()
+{
+  cluster_name_edit->setVisible(true);
+  cluster_name_btn->setVisible(true);
+  cancel_btn->setVisible(true);
+  cluster_join_btn->setEnabled(false);
+  divide_btn->setEnabled(false);
+
+  button_id = 1;
+}
+
+void AnnotationPanel::divideButton()
+{
+  if(selected_points.empty())
+    return;
+
+  cluster_name_edit->setVisible(true);
+  cluster_name_btn->setVisible(true);
+  cancel_btn->setVisible(true);
+  cluster_join_btn->setEnabled(false);
+  divide_btn->setEnabled(false);
+
+  button_id = 2;
+}
+
+void AnnotationPanel::cancelButton()
+{
+  cluster_name_edit->setVisible(false);
+  cluster_name_btn->setVisible(false);
+  cancel_btn->setVisible(false);
+  cluster_join_btn->setEnabled(true);
+  divide_btn->setEnabled(true);
+}
+
+void AnnotationPanel::refreshAction()
+{
+	for(int i=0; i < cluster_topic_list->count(); i++)
+		cluster_topic_list->removeItem(i);
+
+	createTopicList();
+
+	ROS_INFO("Topic list refreshed\n");
+}
+
+void AnnotationPanel::createTopicList()
+{
+	int topic_index = 0;
+	ros::master::V_TopicInfo master_topics;
+	ros::master::getTopics(master_topics);
+
+	for(auto it = master_topics.begin(); it != master_topics.end(); it++)
+	{
+		const ros::master::TopicInfo& info = *it;
+
+		if(info.datatype.find("sensor_msgs/PointCloud2") != std::string::npos)
+			cluster_topic_list->insertItem(topic_index++, QString(info.name.c_str()));
+	}
+
+	std::string current_topic = viz_sub.getTopic();
+	std::string current_list = cluster_topic_list->currentText().toStdString();
+
+	if(current_list == current_topic)
+		return;
+
+	viz_sub.shutdown();
+
+	if(cluster_topic_list->count() > 0){
+		cluster_topic_list->setCurrentIndex(0);
+		viz_sub = nh.subscribe(cluster_topic_list->currentText().toStdString(), 1, vizCallback);
+		ROS_INFO("Subscribed to topic: %s\n", cluster_topic_list->currentText().toStdString().c_str());
+	}
+}
+
+void AnnotationPanel::createNameList()
+{
+	for(auto it = custom_cluster.begin(); it != custom_cluster.end(); it++)
+	{
+		size_t pos = it - custom_cluster.begin();
+		cluster_name_edit->insertItem(pos, QString(it->name.c_str()));
+	}
+}
+
+void AnnotationPanel::divideAction()
+{
+  //find timestamp of current frame in clusters
+  for(int i = 0; i < custom_cluster.size(); i++)
+  	if(msg_stamp.toSec() == custom_cluster[i].stamp.toSec()){
+  		bool found = false;
+
+  		for(auto it = selected_points.begin(); it != selected_points.end(); it++)
+  		{
+  			std::vector<size_t> intersection_pos;
+
+  			for(auto pit = custom_cluster[i].points.begin(); pit != custom_cluster[i].points.end(); pit++)
+  				if(it->x == pit->x and it->y == pit->y and it->z == pit->z){
+  					size_t found_pos = pit - custom_cluster[i].points.begin();
+  					found = true;
+  					intersection_pos.push_back(found_pos);
+  				}
+
+  			if(found)
+  			{
+  				auto it_begin = custom_cluster[i].points.begin();
+
+  				for(int i=0; i < intersection_pos.size(); i++)
+  					custom_cluster[i].points.erase(it_begin + intersection_pos[i]);
+
+  				intersection_pos.clear();
+
+  				//create new class
+  				PointClass pc;
+  				pc.name = cluster_name_edit->currentText().toStdString();
+  				pc.stamp = msg_stamp;
+  				pc.topic = cluster_topic_list->currentText().toStdString();
+  				pc.type = "sensor_msgs/PointCloud2";
+  				pc.points = selected_points;
+
+  				custom_cluster.push_back(pc);
+
+			    insertMarker(selected_points);
+  				break;
+  			}
+  		}
+  	}
+
+  marker_pub.publish(marker_array);
+  ros::spinOnce();
+
+  cluster_name_edit->setVisible(false);
+  cluster_name_btn->setVisible(false);
+  cancel_btn->setVisible(false);
+  id_state_show->setText("");  
 }
 
 // Save all configuration data from this panel to the given
@@ -366,7 +466,7 @@ void AnnotationPanel::save( rviz::Config config ) const
   std::string csv_path = homepath + "/Ros_WS/" + filename;
 
   std::ofstream csvfile;
-  csvfile.open(csv_path, std::ios::out | std::ios::app);
+  csvfile.open(csv_path, std::ios::out | std::ios::trunc);
 
   if(!csvfile.is_open())
   {
