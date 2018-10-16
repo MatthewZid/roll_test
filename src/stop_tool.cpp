@@ -321,7 +321,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			}
 
 			if(found_point_cntr < num_points)
-				ROS_WARN("Missing cloud points!\n");
+				ROS_WARN("Stop tool: Missing cloud points!\n");
 
 			//find different id's
 			std::string state_msg;
