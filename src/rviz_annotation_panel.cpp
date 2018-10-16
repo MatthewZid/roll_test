@@ -16,7 +16,7 @@ void selectionCallback(const roll_test::PointSelection& msg)
   selected_points.clear();
   selected_points = msg.points;
   id_state_show->setText(QString(msg.state_msg.data.c_str()));
-  ROS_WARN("Received selected points\n");
+  ROS_WARN("\nAnnotation: Received selected points\n");
 }
 
 void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
@@ -24,7 +24,7 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 	msg_frame = msg->header.frame_id;
 	msg_stamp = msg->header.stamp;
 
-   	marker_array.markers.clear();
+  marker_array.markers.clear();
 
 	visualization_msgs::Marker marker;
 
@@ -36,20 +36,21 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 
 	marker.action = visualization_msgs::Marker::DELETEALL;
 
-    marker.color.a = 0.0;
-    marker_array.markers.push_back(marker);
-    marker_pub.publish(marker_array);
+  marker.color.a = 0.0;
+  marker_array.markers.push_back(marker);
+  marker_pub.publish(marker_array);
 
-  	for(int i=0; i < custom_cluster.size(); i++)
-  	{
-    	if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
-      		continue;
+  marker_array.markers.clear();
 
-    	insertMarker(custom_cluster[i].points);
-  	}
+	for(int i=0; i < custom_cluster.size(); i++)
+	{
+  	if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
+    		continue;
 
-  	marker_pub.publish(marker_array);
-  	ros::spinOnce();
+  	insertMarker(custom_cluster[i].points);
+	}
+
+	marker_pub.publish(marker_array);
 }
 
 void insertMarker(const std::vector<geometry_msgs::Point>& points_vec)
@@ -404,41 +405,42 @@ void AnnotationPanel::divideAction()
   for(int i = 0; i < custom_cluster.size(); i++)
   	if(msg_stamp.toSec() == custom_cluster[i].stamp.toSec()){
   		bool found = false;
+      std::vector<size_t> intersection_pos;
 
   		for(auto it = selected_points.begin(); it != selected_points.end(); it++)
   		{
-  			std::vector<size_t> intersection_pos;
-
   			for(auto pit = custom_cluster[i].points.begin(); pit != custom_cluster[i].points.end(); pit++)
   				if(it->x == pit->x and it->y == pit->y and it->z == pit->z){
   					size_t found_pos = pit - custom_cluster[i].points.begin();
   					found = true;
   					intersection_pos.push_back(found_pos);
+            break;
   				}
 
-  			if(found)
-  			{
-  				auto it_begin = custom_cluster[i].points.begin();
+        if(found)
+          break;
+      }
 
-  				for(int i=0; i < intersection_pos.size(); i++)
-  					custom_cluster[i].points.erase(it_begin + intersection_pos[i]);
+			if(found)
+			{
+				for(int j=0; j < intersection_pos.size(); j++)
+					custom_cluster[i].points.erase(custom_cluster[i].points.begin() + intersection_pos[j]);
 
-  				intersection_pos.clear();
+				intersection_pos.clear();
 
-  				//create new class
-  				PointClass pc;
-  				pc.name = cluster_name_edit->currentText().toStdString();
-  				pc.stamp = msg_stamp;
-  				pc.topic = cluster_topic_list->currentText().toStdString();
-  				pc.type = "sensor_msgs/PointCloud2";
-  				pc.points = selected_points;
+				//create new class
+				PointClass pc;
+				pc.name = cluster_name_edit->currentText().toStdString();
+				pc.stamp = msg_stamp;
+				pc.topic = cluster_topic_list->currentText().toStdString();
+				pc.type = "sensor_msgs/PointCloud2";
+				pc.points = selected_points;
 
-  				custom_cluster.push_back(pc);
+				custom_cluster.push_back(pc);
 
-			    insertMarker(selected_points);
-  				break;
-  			}
-  		}
+		    insertMarker(selected_points);
+        break;
+			}
   	}
 
   marker_pub.publish(marker_array);
@@ -477,7 +479,9 @@ void AnnotationPanel::save( rviz::Config config ) const
   //write out annotation
   for(auto it=custom_cluster.begin(); it != custom_cluster.end(); it++)
   {
-    csvfile << it->name << "," << it->stamp.toSec() << "," << it->topic << "," << it->type;
+    csvfile << it->name << ",";
+    csvfile << std::fixed << std::setprecision(10) << it->stamp.toSec() << ",";
+    csvfile << it->topic << "," << it->type;
     csvfile << ",[";
  
     bool first_time = true;
@@ -581,7 +585,7 @@ void AnnotationPanel::load( const rviz::Config& config )
 
   csvfile.close();
 
-  ROS_INFO("Successful csv loading\n");
+  ROS_INFO("%s loaded successfully\n", filename.c_str());
 }
 
 } // end namespace rviz_plugin_tutorials
