@@ -31,7 +31,7 @@
 
 class QLineEdit;
 
-void insertMarker(const std::vector<geometry_msgs::Point>& points_vec);
+void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std::string& cl_name);
 
 namespace roll_test
 {

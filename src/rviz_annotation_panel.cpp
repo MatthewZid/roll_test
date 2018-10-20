@@ -44,16 +44,15 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 
 	for(int i=0; i < custom_cluster.size(); i++)
 	{
-  	if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
+  		if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
     		continue;
-
-  	insertMarker(custom_cluster[i].points);
+  		insertMarker(custom_cluster[i].points, custom_cluster[i].name);
 	}
 
 	marker_pub.publish(marker_array);
 }
 
-void insertMarker(const std::vector<geometry_msgs::Point>& points_vec)
+void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std::string& cl_name)
 {
   //aabb around selected points (with marker)
   pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -108,9 +107,9 @@ void insertMarker(const std::vector<geometry_msgs::Point>& points_vec)
   marker.type = shape;
   marker.action = visualization_msgs::Marker::ADD;
 
-  marker.pose.position.x = tfinal.x();;
-  marker.pose.position.y = tfinal.y();;
-  marker.pose.position.z = tfinal.z();;
+  marker.pose.position.x = tfinal.x();
+  marker.pose.position.y = tfinal.y();
+  marker.pose.position.z = tfinal.z();
   marker.pose.orientation.x = qfinal.x();
   marker.pose.orientation.y = qfinal.y();
   marker.pose.orientation.z = qfinal.z();
@@ -151,7 +150,37 @@ void insertMarker(const std::vector<geometry_msgs::Point>& points_vec)
 
   marker.lifetime = ros::Duration();
 
+  //set text marker to display class name
+  visualization_msgs::Marker text_marker;
+
+  text_marker.header.frame_id = msg_frame;
+  text_marker.header.stamp = msg_stamp;
+
+  text_marker.ns = "class";
+  text_marker.id = marker_id++;
+
+  text_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+  text_marker.action = visualization_msgs::Marker::ADD;
+
+  text_marker.pose.position.x = tfinal.x();
+  text_marker.pose.position.y = tfinal.y();
+  text_marker.pose.position.z = tfinal.z() + marker.scale.z - 0.1;
+  text_marker.pose.orientation.x = qfinal.x();
+  text_marker.pose.orientation.y = qfinal.y();
+  text_marker.pose.orientation.z = qfinal.z();
+  text_marker.pose.orientation.w = qfinal.w();
+
+  text_marker.scale.z = 0.1;
+
+  text_marker.color.r = 1.0;
+  text_marker.color.g = 1.0;
+  text_marker.color.b = 1.0;
+  text_marker.color.a = 1.0;
+  text_marker.text = cl_name;
+  text_marker.lifetime = ros::Duration();
+
   marker_array.markers.push_back(marker);
+  marker_array.markers.push_back(text_marker);
 }
 
 namespace roll_test
@@ -306,7 +335,7 @@ void AnnotationPanel::nameClusterButton()
 
   custom_cluster.push_back(pc);
 
-  insertMarker(selected_points);
+  insertMarker(selected_points, pc.name);
 
   marker_pub.publish(marker_array);
   ros::spinOnce();
@@ -405,51 +434,49 @@ void AnnotationPanel::divideAction()
   for(int i = 0; i < custom_cluster.size(); i++)
   	if(msg_stamp.toSec() == custom_cluster[i].stamp.toSec()){
   		bool found = false;
-      std::vector<size_t> intersection_pos;
 
   		for(auto it = selected_points.begin(); it != selected_points.end(); it++)
   		{
   			for(auto pit = custom_cluster[i].points.begin(); pit != custom_cluster[i].points.end(); pit++)
   				if(it->x == pit->x and it->y == pit->y and it->z == pit->z){
-  					size_t found_pos = pit - custom_cluster[i].points.begin();
   					found = true;
-  					intersection_pos.push_back(found_pos);
-            break;
+  					custom_cluster[i].points.erase(pit);
+            		break;
   				}
+      	}
 
-        if(found)
-          break;
-      }
+      	if(!found){
+      		ROS_WARN("There is nothing to separate!\n Press Join to create new class\n");
 
-			if(found)
-			{
-				for(int j=0; j < intersection_pos.size(); j++)
-					custom_cluster[i].points.erase(custom_cluster[i].points.begin() + intersection_pos[j]);
+      		cluster_join_btn->setEnabled(true);
+      		cluster_name_edit->setVisible(false);
+		    cluster_name_btn->setVisible(false);
+		    cancel_btn->setVisible(false);
 
-				intersection_pos.clear();
+		    return;
+      	}
 
-				//create new class
-				PointClass pc;
-				pc.name = cluster_name_edit->currentText().toStdString();
-				pc.stamp = msg_stamp;
-				pc.topic = cluster_topic_list->currentText().toStdString();
-				pc.type = "sensor_msgs/PointCloud2";
-				pc.points = selected_points;
+		//create new class
+		PointClass pc;
+		pc.name = cluster_name_edit->currentText().toStdString();
+		pc.stamp = msg_stamp;
+		pc.topic = cluster_topic_list->currentText().toStdString();
+		pc.type = "sensor_msgs/PointCloud2";
+		pc.points = selected_points;
 
-				custom_cluster.push_back(pc);
+		custom_cluster.push_back(pc);
 
-		    insertMarker(selected_points);
-        break;
-			}
+    	insertMarker(selected_points, pc.name);
+
+    	marker_pub.publish(marker_array);
+	    ros::spinOnce();
+
+	    cluster_name_edit->setVisible(false);
+	    cluster_name_btn->setVisible(false);
+	    cancel_btn->setVisible(false);
+	    id_state_show->setText("");  
+		break;
   	}
-
-  marker_pub.publish(marker_array);
-  ros::spinOnce();
-
-  cluster_name_edit->setVisible(false);
-  cluster_name_btn->setVisible(false);
-  cancel_btn->setVisible(false);
-  id_state_show->setText("");  
 }
 
 // Save all configuration data from this panel to the given
