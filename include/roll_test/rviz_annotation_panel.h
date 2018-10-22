@@ -25,25 +25,17 @@
 #include <QGroupBox>
 #include <QComboBox>
 
-#include <fstream>
-#include <regex>
+#include <roll_test/point_class.h>
 #endif
 
 class QLineEdit;
 
 void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std::string& cl_name);
+void publishDeleteMarker();
+void updateMarkers();
 
 namespace roll_test
 {
-
-typedef struct pointClass
-{
-  std::string name;
-  ros::Time stamp;
-  std::string topic;
-  std::string type;
-  std::vector<geometry_msgs::Point> points;
-}PointClass;
 // BEGIN_TUTORIAL
 // Here we declare our new subclass of rviz::Panel.  Every panel which
 // can be added via the Panels/Add_New_Panel menu is a subclass of

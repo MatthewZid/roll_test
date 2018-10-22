@@ -7,6 +7,8 @@ std::string msg_frame;
 ros::Time msg_stamp;
 
 int marker_id = 0;
+int text_marker_id = 0;
+
 ros::Publisher marker_pub;
 visualization_msgs::MarkerArray marker_array;
 std::vector<roll_test::PointClass> custom_cluster;
@@ -24,32 +26,9 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 	msg_frame = msg->header.frame_id;
 	msg_stamp = msg->header.stamp;
 
-  marker_array.markers.clear();
+  updateMarkers();
 
-	visualization_msgs::Marker marker;
-
-	marker.header.frame_id = msg->header.frame_id;
-	marker.header.stamp = msg->header.stamp;
-
-	marker.ns = "clear_markers";
-	marker.id = 0;
-
-	marker.action = visualization_msgs::Marker::DELETEALL;
-
-  marker.color.a = 0.0;
-  marker_array.markers.push_back(marker);
   marker_pub.publish(marker_array);
-
-  marker_array.markers.clear();
-
-	for(int i=0; i < custom_cluster.size(); i++)
-	{
-  		if(msg->header.stamp.toSec() != custom_cluster[i].stamp.toSec())
-    		continue;
-  		insertMarker(custom_cluster[i].points, custom_cluster[i].name);
-	}
-
-	marker_pub.publish(marker_array);
 }
 
 void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std::string& cl_name)
@@ -156,8 +135,8 @@ void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std
   text_marker.header.frame_id = msg_frame;
   text_marker.header.stamp = msg_stamp;
 
-  text_marker.ns = "class";
-  text_marker.id = marker_id++;
+  text_marker.ns = "text";
+  text_marker.id = text_marker_id++;
 
   text_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
   text_marker.action = visualization_msgs::Marker::ADD;
@@ -181,6 +160,41 @@ void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std
 
   marker_array.markers.push_back(marker);
   marker_array.markers.push_back(text_marker);
+}
+
+void publishDeleteMarker()
+{
+  marker_array.markers.clear();
+
+  visualization_msgs::Marker marker;
+
+  marker.header.frame_id = msg_frame;
+  marker.header.stamp = msg_stamp;
+
+  marker.ns = "clear_markers";
+  marker.id = 0;
+
+  marker.action = visualization_msgs::Marker::DELETEALL;
+
+  marker.color.a = 0.0;
+  marker_array.markers.push_back(marker);
+  marker_pub.publish(marker_array);
+
+  marker_array.markers.clear();
+}
+
+void updateMarkers()
+{
+  publishDeleteMarker();
+
+  marker_id = text_marker_id = 0;
+
+  for(int i=0; i < custom_cluster.size(); i++)
+  {
+      if(msg_stamp.toSec() != custom_cluster[i].stamp.toSec())
+        continue;
+      insertMarker(custom_cluster[i].points, custom_cluster[i].name);
+  }
 }
 
 namespace roll_test
@@ -441,41 +455,41 @@ void AnnotationPanel::divideAction()
   				if(it->x == pit->x and it->y == pit->y and it->z == pit->z){
   					found = true;
   					custom_cluster[i].points.erase(pit);
-            		break;
+            break;
   				}
-      	}
+      }
 
-      	if(!found){
-      		ROS_WARN("There is nothing to separate!\n Press Join to create new class\n");
+    	if(!found){
+    		ROS_WARN("There is nothing to separate!\n Press Join to create new class\n");
 
-      		cluster_join_btn->setEnabled(true);
-      		cluster_name_edit->setVisible(false);
-		    cluster_name_btn->setVisible(false);
-		    cancel_btn->setVisible(false);
+    		cluster_join_btn->setEnabled(true);
+    		cluster_name_edit->setVisible(false);
+	      cluster_name_btn->setVisible(false);
+	      cancel_btn->setVisible(false);
 
-		    return;
-      	}
+	      return;
+    	}
 
-		//create new class
-		PointClass pc;
-		pc.name = cluster_name_edit->currentText().toStdString();
-		pc.stamp = msg_stamp;
-		pc.topic = cluster_topic_list->currentText().toStdString();
-		pc.type = "sensor_msgs/PointCloud2";
-		pc.points = selected_points;
+  		//create new class
+  		PointClass pc;
+  		pc.name = cluster_name_edit->currentText().toStdString();
+  		pc.stamp = msg_stamp;
+  		pc.topic = cluster_topic_list->currentText().toStdString();
+  		pc.type = "sensor_msgs/PointCloud2";
+  		pc.points = selected_points;
 
-		custom_cluster.push_back(pc);
+  		custom_cluster.push_back(pc);
 
-    	insertMarker(selected_points, pc.name);
+      updateMarkers();
 
     	marker_pub.publish(marker_array);
-	    ros::spinOnce();
+      ros::spinOnce();
 
-	    cluster_name_edit->setVisible(false);
-	    cluster_name_btn->setVisible(false);
-	    cancel_btn->setVisible(false);
-	    id_state_show->setText("");  
-		break;
+      cluster_name_edit->setVisible(false);
+      cluster_name_btn->setVisible(false);
+      cancel_btn->setVisible(false);
+      id_state_show->setText("");  
+  		break;
   	}
 }
 
@@ -543,76 +557,7 @@ void AnnotationPanel::load( const rviz::Config& config )
 
   ROS_INFO("Loading csv...\n");
 
-  std::string homepath = std::getenv("HOME");
-  std::string filename = "annotation.csv";
-  std::string csv_path = homepath + "/Ros_WS/" + filename;
-
-  std::ifstream csvfile(csv_path);
-
-  if(!csvfile.is_open())
-  {
-    ROS_WARN("%s could not be opened!\n", filename.c_str());
-    return;
-  }
-
-  //read annotation fields
-  std::string line;
-
-  while(std::getline(csvfile, line))
-  {
-  	PointClass pc;
-  	std::istringstream lss(line);
-
-  	std::getline(lss, line, ',');
-  	pc.name = line;
-
-  	double tm;
-  	std::getline(lss, line, ',');
-  	std::istringstream(line) >> tm;
-  	pc.stamp.fromSec(tm);
-
-  	std::getline(lss, line, ',');
-  	pc.topic = line;
-
-  	std::getline(lss, line, ',');
-  	pc.type = line;
-
-  	std::getline(lss, line);
-  	std::smatch m;
-  	std::regex reg("([\\w,\\w,\\w]([^\\(|\\)|\\])]*))([^,|\\(|\\)])");	//pattern: find x,y,z in list [(x,y,z),...]
-  	std::vector<geometry_msgs::Point> pvec;
-
-  	while(std::regex_search(line, m, reg)){
-  		std::istringstream pss(m[0]);
-  		std::string num;
-  		geometry_msgs::Point point;
-
-  		double pt;
-  		std::getline(pss, num, ',');
-  		std::istringstream(num) >> pt;
-  		point.x = pt;
-
-  		std::getline(pss, num, ',');
-  		std::istringstream(num) >> pt;
-  		point.y = pt;
-
-  		std::getline(pss, num, ',');
-  		std::istringstream(num) >> pt;
-  		point.z = pt;
-
-  		pvec.push_back(point);
-
-		line = m.suffix().str();
-	}
-
-	pc.points = pvec;
-
-	custom_cluster.push_back(pc);
-  }
-
-  csvfile.close();
-
-  ROS_INFO("%s loaded successfully\n", filename.c_str());
+  custom_cluster = readcsv();
 }
 
 } // end namespace rviz_plugin_tutorials
