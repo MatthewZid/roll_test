@@ -90,6 +90,7 @@ set(SRC_FILES
   src/rviz_control_panel.cpp
   src/rviz_time_translator.cpp
   src/rviz_annotation_panel.cpp
+  src/point_class.cpp
 )
 
 set(HEADER_FILES
@@ -100,6 +101,7 @@ set(HEADER_FILES
   include/${PROJECT_NAME}/rviz_control_panel.h
   include/${PROJECT_NAME}/rviz_time_translator.h
   include/${PROJECT_NAME}/rviz_annotation_panel.h
+  include/${PROJECT_NAME}/point_class.h
 )
 
 ## Declare a C++ library
@@ -118,6 +120,9 @@ target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} ${catkin_LIBRARIES})
 add_executable(gzbCntrl src/gzbControl.cpp)
 target_link_libraries(gzbCntrl ${catkin_LIBRARIES} ${QT_LIBRARIES} ${OGRE_LIBRARIES})
 
+add_executable(exportBag src/export_bag.cpp)
+target_link_libraries(exportBag ${catkin_LIBRARIES} ${PROJECT_NAME})
+
 #add_executable(stop_display src/stop_display.cpp)
 #target_link_libraries(stop_display ${catkin_LIBRARIES}  ${QT_LIBRARIES} ${OGRE_LIBRARIES})
 
@@ -133,6 +138,7 @@ target_link_libraries(gzbCntrl ${catkin_LIBRARIES} ${QT_LIBRARIES} ${OGRE_LIBRAR
 ## Add cmake target dependencies of the executable
 ## same as for the library above
  add_dependencies(gzbCntrl roll_test_generate_messages_cpp)
+ add_dependencies(exportBag roll_test_generate_messages_cpp)
 
 install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
