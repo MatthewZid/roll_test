@@ -81,4 +81,27 @@ std::vector<PointClass> readcsv()
 	return cc;
 }
 
+size_t binarySearch(const std::vector<PointClass>& pcvec, size_t l, size_t r, const ros::Time x)
+{
+	if(l <= r)
+	{
+		size_t mid = l + (r - l) / 2;
+
+		if(pcvec[mid].stamp.toSec() == x.toSec())
+			return mid;
+
+		if(pcvec[mid].stamp.toSec() > x.toSec())
+			return binarySearch(pcvec, l, mid -1, x);
+
+		return binarySearch(pcvec, mid + 1, r, x);
+	}
+
+	return -1;
+}
+
+size_t cluster_search(const std::vector<PointClass>& pcvec, const ros::Time x)
+{
+	return binarySearch(pcvec, 0, pcvec.size()-1, x);
+}
+
 } // end namespace

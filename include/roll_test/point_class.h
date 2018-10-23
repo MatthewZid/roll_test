@@ -19,6 +19,8 @@ typedef struct pointClass
 }PointClass;
 
 std::vector<PointClass> readcsv();
+size_t binarySearch(const std::vector<PointClass>& pcvec, size_t l, size_t r, double x);
+size_t cluster_search(const std::vector<PointClass>& pcvec, const ros::Time x);
 
 }
 
