@@ -5,6 +5,8 @@
 #include <roll_test/point_class.h>
 #include <fstream>
 
+#include <pcl_ros/point_cloud.h>
+
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "exportBag");
@@ -63,6 +65,14 @@ int main(int argc, char **argv)
 		}
 
 		//if pointcloud2, consult csv and then write
+		boost::shared_ptr<sensor_msgs::PointCloud2> pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
+		pcl::PCLPointCloud2 cloud2;
+        pcl_conversions::toPCL(*pc_msg, cloud2);
+
+        pcl::PointCloud<pcl::PointXYZRGB> cloud;
+        pcl::fromPCLPointCloud2(cloud2, cloud);
+
+        for(int i=0; i < )
 	}
 
 	input_bag.close();
