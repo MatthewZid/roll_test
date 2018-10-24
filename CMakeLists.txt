@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   sensor_msgs
   message_generation
+  pointcloud_msgs
   pcl_ros
   tf
   rviz
@@ -63,7 +64,7 @@ add_definitions(-DQT_NO_KEYWORDS)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES roll_test
+  LIBRARIES ${PROJECT_NAME}
   CATKIN_DEPENDS roscpp message_runtime
  # DEPENDS system_lib
 )
@@ -90,7 +91,6 @@ set(SRC_FILES
   src/rviz_control_panel.cpp
   src/rviz_time_translator.cpp
   src/rviz_annotation_panel.cpp
-  src/point_class.cpp
 )
 
 set(HEADER_FILES
@@ -101,18 +101,18 @@ set(HEADER_FILES
   include/${PROJECT_NAME}/rviz_control_panel.h
   include/${PROJECT_NAME}/rviz_time_translator.h
   include/${PROJECT_NAME}/rviz_annotation_panel.h
-  include/${PROJECT_NAME}/point_class.h
 )
 
 ## Declare a C++ library
 #
  add_library(${PROJECT_NAME} ${SRC_FILES} ${HEADER_FILES})
+ add_library(pclass src/point_class.cpp include/${PROJECT_NAME}/point_class.h)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} ${catkin_LIBRARIES} pclass)
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
@@ -121,7 +121,7 @@ add_executable(gzbCntrl src/gzbControl.cpp)
 target_link_libraries(gzbCntrl ${catkin_LIBRARIES} ${QT_LIBRARIES} ${OGRE_LIBRARIES})
 
 add_executable(exportBag src/export_bag.cpp)
-target_link_libraries(exportBag ${catkin_LIBRARIES} ${PROJECT_NAME})
+target_link_libraries(exportBag ${catkin_LIBRARIES} pclass)
 
 #add_executable(stop_display src/stop_display.cpp)
 #target_link_libraries(stop_display ${catkin_LIBRARIES}  ${QT_LIBRARIES} ${OGRE_LIBRARIES})
