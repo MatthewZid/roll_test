@@ -7,16 +7,16 @@
 
 #include <pcl_ros/point_cloud.h>
 
-/*bool sortWay(roll_test::PointClass a, roll_test::PointClass b)
+bool sortWay(roll_test::PointClass a, roll_test::PointClass b)
 {
 	return(a.stamp.toSec() < b.stamp.toSec());
-}*/
+}
 
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "exportBag");
 
-	ros::NodeHandle n;
+	std::srand(std::time(nullptr));
 
 	//initialize files
 	rosbag::Bag input_bag;
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 	bag_view.addQuery(input_bag);
 
 	//sort clusters according to stamp
-	//std::sort(cluster.begin(), cluster.end(), sortWay);
+	std::sort(cluster.begin(), cluster.end(), sortWay);
 
 	//create timestamp map
 	std::map< double, std::vector<size_t> > stamp_map;
@@ -76,6 +76,25 @@ int main(int argc, char **argv)
 
 		if(!posvec.empty())
 			stamp_map.insert(std::make_pair(m.getTime().toSec(), posvec));
+	}
+
+	//class count
+	std::set<std::string> clusters_set;
+
+	for(int i=0; i < cluster.size(); i++)
+		clusters_set.insert(cluster[i].name);
+
+	int class_num = clusters_set.size();
+
+	//class-color map
+	std::map<std::string, int> color_map;
+
+	for(auto it = clusters_set.begin(); it != clusters_set.end(); it++)
+	{
+		int color_val = std::rand() % class_num;
+		std::string class_name = *it;
+
+		color_map.insert(std::make_pair(class_name, color_val));
 	}
 
 	//write messages to output bagfile, consulting csv annotations
@@ -114,8 +133,8 @@ int main(int argc, char **argv)
         				cloud.points[j].z == cluster[pos].points[k].z)
         			{
         				found = true;
-
-        				//do some stuff
+        				
+        				//find color for class
 
         				break;
         			}
