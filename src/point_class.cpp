@@ -19,6 +19,8 @@ std::vector<PointClass> readcsv()
 	return cc;
 	}
 
+	ROS_INFO("Loading csv...\n");
+
 	//read annotation fields
 	std::string line;
 
@@ -34,6 +36,11 @@ std::vector<PointClass> readcsv()
 		std::getline(lss, line, ',');
 		std::istringstream(line) >> tm;
 		pc.stamp.fromSec(tm);
+
+		double otm;
+		std::getline(lss, line, ',');
+		std::istringstream(line) >> otm;
+		pc.original_stamp.fromSec(otm);
 
 		std::getline(lss, line, ',');
 		pc.topic = line;
