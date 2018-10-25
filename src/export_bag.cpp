@@ -9,14 +9,12 @@
 
 bool sortWay(roll_test::PointClass a, roll_test::PointClass b)
 {
-	return(a.stamp.toSec() < b.stamp.toSec());
+	return(a.original_stamp.toSec() < b.original_stamp.toSec());
 }
 
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "exportBag");
-
-	std::srand(std::time(nullptr));
 
 	//initialize files
 	rosbag::Bag input_bag;
@@ -71,7 +69,7 @@ int main(int argc, char **argv)
 		std::vector<size_t> posvec;
 
 		for(int i=0; i < cluster.size(); i++)
-			if(m.getTime().toSec() == cluster[i].stamp.toSec())
+			if(m.getTime().toSec() == cluster[i].original_stamp.toSec())
 				posvec.push_back(i);
 
 		if(!posvec.empty())
@@ -87,28 +85,45 @@ int main(int argc, char **argv)
 	int class_num = clusters_set.size();
 
 	//class-color map
-	std::map<std::string, int> color_map;
+	std::map<std::string, pcl::PointXYZRGB> color_map;
 
 	for(auto it = clusters_set.begin(); it != clusters_set.end(); it++)
 	{
-		int color_val = std::rand() % class_num;
+		size_t pos = std::distance(clusters_set.begin(), it);
+		int color_id = pos % 3;
 		std::string class_name = *it;
+		pcl::PointXYZRGB color_val;
+
+		if(color_id == 0){
+			color_val.r = 255;
+			color_val.g = 255 * pos % 255;
+			color_val.b = 255 * pos % 255;
+		}
+		else if(color_id == 1){
+			color_val.r = 255 * pos % 255;
+			color_val.g = 255;
+			color_val.b = 255 * pos % 255;
+		}
+		else if(color_id == 2){
+			color_val.r = 255 * pos % 255;
+			color_val.g = 255 * pos % 255;
+			color_val.b = 255;
+		}
 
 		color_map.insert(std::make_pair(class_name, color_val));
 	}
-
 	//write messages to output bagfile, consulting csv annotations
 	for(rosbag::MessageInstance m : bag_view)
 	{
 		if(!m.isType<sensor_msgs::PointCloud2>()){
-			output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
+			//output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
 			continue;
 		}
 
 		auto it = stamp_map.find(m.getTime().toSec());
 
         if(it == stamp_map.end()){
-        	output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
+        	//output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
         	continue;
         }
 
@@ -120,21 +135,25 @@ int main(int argc, char **argv)
         pcl::PointCloud<pcl::PointXYZRGB> cloud;
         pcl::fromPCLPointCloud2(cloud2, cloud);
 
-        for(int i=0; i < it->second.size(); i++)
+        for(int i=0; i < cloud.points.size(); i++)
         {
-        	size_t pos = (it->second)[i];
         	bool found = false;
 
-        	for(int j=0; j < cloud.points.size(); j++)
+        	for(int j=0; j < it->second.size(); j++)
         	{
+        		size_t pos = (it->second)[j];
+
         		for(int k=0; k < cluster[pos].points.size(); k++)
-        			if(cloud.points[j].x == cluster[pos].points[k].x and
-        				cloud.points[j].y == cluster[pos].points[k].y and
-        				cloud.points[j].z == cluster[pos].points[k].z)
+        			if(cloud.points[i].x == cluster[pos].points[k].x and
+        				cloud.points[i].y == cluster[pos].points[k].y and
+        				cloud.points[i].z == cluster[pos].points[k].z)
         			{
         				found = true;
-        				
-        				//find color for class
+        				auto colit = color_map.find(cluster[pos].name);
+
+        				cloud.points[i].r = colit->second.r;
+        				cloud.points[i].g = colit->second.g;
+        				cloud.points[i].b = colit->second.b;
 
         				break;
         			}
@@ -143,9 +162,21 @@ int main(int argc, char **argv)
         			break;
         	}
 
-        	if(found)
-        		break;
+        	if(!found)
+        	{
+        		cloud.points[i].r = 80;
+				cloud.points[i].g = 80;
+				cloud.points[i].b = 80;
+        	}
         }
+
+        boost::shared_ptr<sensor_msgs::PointCloud2> final_pcmsg(boost::make_shared<sensor_msgs::PointCloud2>());
+
+        pcl::PCLPointCloud2 cloud_annot;
+        pcl::toPCLPointCloud2(cloud, cloud_annot);
+        pcl_conversions::fromPCL(cloud_annot, *final_pcmsg);
+
+        output_bag.write(m.getTopic(), m.getTime(), final_pcmsg, m.getConnectionHeader());
 	}
 
 	input_bag.close();
