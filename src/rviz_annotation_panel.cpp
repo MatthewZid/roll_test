@@ -5,6 +5,7 @@ std::vector<geometry_msgs::Point> selected_points;
 
 std::string msg_frame;
 ros::Time msg_stamp;
+ros::Time original_stamp;
 
 int marker_id = 0;
 int text_marker_id = 0;
@@ -18,6 +19,7 @@ void selectionCallback(const roll_test::PointSelection& msg)
   selected_points.clear();
   selected_points = msg.points;
   id_state_show->setText(QString(msg.state_msg.data.c_str()));
+  original_stamp = msg.original_stamp;
   ROS_WARN("\nAnnotation: Received selected points\n");
 }
 
@@ -343,6 +345,7 @@ void AnnotationPanel::nameClusterButton()
   PointClass pc;
   pc.name = cluster_name_edit->currentText().toStdString();
   pc.stamp = msg_stamp;
+  pc.original_stamp = original_stamp;
   pc.topic = cluster_topic_list->currentText().toStdString();
   pc.type = "sensor_msgs/PointCloud2";
   pc.points = selected_points;
@@ -474,6 +477,7 @@ void AnnotationPanel::divideAction()
   		PointClass pc;
   		pc.name = cluster_name_edit->currentText().toStdString();
   		pc.stamp = msg_stamp;
+      pc.original_stamp = original_stamp;
   		pc.topic = cluster_topic_list->currentText().toStdString();
   		pc.type = "sensor_msgs/PointCloud2";
   		pc.points = selected_points;
@@ -522,6 +526,7 @@ void AnnotationPanel::save( rviz::Config config ) const
   {
     csvfile << it->name << ",";
     csvfile << std::fixed << std::setprecision(10) << it->stamp.toSec() << ",";
+    csvfile << it->original_stamp << ",";
     csvfile << it->topic << "," << it->type;
     csvfile << ",[";
  
@@ -554,8 +559,6 @@ void AnnotationPanel::load( const rviz::Config& config )
   //   cluster_topic_list->setText( topic );
   //   updateTopic();
   // }
-
-  ROS_INFO("Loading csv...\n");
 
   custom_cluster = readcsv();
 }
