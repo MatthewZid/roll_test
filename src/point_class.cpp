@@ -37,11 +37,6 @@ std::vector<PointClass> readcsv()
 		std::istringstream(line) >> tm;
 		pc.stamp.fromSec(tm);
 
-		double otm;
-		std::getline(lss, line, ',');
-		std::istringstream(line) >> otm;
-		pc.original_stamp.fromSec(otm);
-
 		std::getline(lss, line, ',');
 		pc.topic = line;
 

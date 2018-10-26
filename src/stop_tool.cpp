@@ -354,7 +354,6 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			}
 
 			found_points.state_msg.data = state_msg;
-			found_points.original_stamp = cluster_msg.original_stamp;
 
 			selection_pub.publish(found_points);
 			ros::spinOnce();

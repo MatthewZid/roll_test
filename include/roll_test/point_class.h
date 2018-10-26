@@ -13,7 +13,6 @@ typedef struct pointClass
 {
   std::string name;
   ros::Time stamp;
-  ros::Time original_stamp;
   std::string topic;
   std::string type;
   std::vector<geometry_msgs::Point> points;

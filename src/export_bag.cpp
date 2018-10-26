@@ -9,7 +9,7 @@
 
 bool sortWay(roll_test::PointClass a, roll_test::PointClass b)
 {
-	return(a.original_stamp.toSec() < b.original_stamp.toSec());
+	return(a.stamp.toSec() < b.stamp.toSec());
 }
 
 int main(int argc, char **argv)
@@ -59,22 +59,28 @@ int main(int argc, char **argv)
 	bag_view.addQuery(input_bag);
 
 	//sort clusters according to stamp
-	std::sort(cluster.begin(), cluster.end(), sortWay);
+	//std::sort(cluster.begin(), cluster.end(), sortWay);
 
 	//create timestamp map
 	std::map< double, std::vector<size_t> > stamp_map;
 
 	for(rosbag::MessageInstance m : bag_view)
 	{
+		if(!m.isType<sensor_msgs::PointCloud2>())
+			continue;
+
 		std::vector<size_t> posvec;
 
 		for(int i=0; i < cluster.size(); i++)
-			if(m.getTime().toSec() == cluster[i].original_stamp.toSec())
+			if(m.getTime().toSec() == cluster[i].stamp.toSec())
 				posvec.push_back(i);
 
 		if(!posvec.empty())
 			stamp_map.insert(std::make_pair(m.getTime().toSec(), posvec));
 	}
+
+	if(stamp_map.empty())
+		ROS_WARN("HSHGJHG");
 
 	//class count
 	std::set<std::string> clusters_set;
@@ -181,6 +187,8 @@ int main(int argc, char **argv)
 
 	input_bag.close();
 	output_bag.close();
+
+	ROS_INFO("Exported annotated bag\n");
 
 	return 0;
 }
