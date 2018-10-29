@@ -2,9 +2,12 @@
 
 QLineEdit* id_state_show;
 std::vector<geometry_msgs::Point> selected_points;
+std::vector<long> cluster_pos;
+std::vector<long> point_pos;
 
 std::string msg_frame;
 ros::Time msg_stamp;
+ros::Time segment_stamp;
 
 int marker_id = 0;
 int text_marker_id = 0;
@@ -16,7 +19,13 @@ std::vector<roll_test::PointClass> custom_cluster;
 void selectionCallback(const roll_test::PointSelection& msg)
 {
   selected_points.clear();
+  cluster_pos.clear();
+  point_pos.clear();
+
   selected_points = msg.points;
+  cluster_pos = msg.cluster_pos;
+  point_pos = msg.point_pos;
+  segment_stamp = msg.segment_stamp;
   id_state_show->setText(QString(msg.state_msg.data.c_str()));
   ROS_WARN("\nAnnotation: Received selected points\n");
 }
@@ -25,7 +34,6 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
 	msg_frame = msg->header.frame_id;
 	msg_stamp = msg->header.stamp;
-  ROS_INFO("%lf\n", msg_stamp.toSec());
 
   updateMarkers();
 
@@ -344,9 +352,12 @@ void AnnotationPanel::nameClusterButton()
   PointClass pc;
   pc.name = cluster_name_edit->currentText().toStdString();
   pc.stamp = msg_stamp;
+  pc.segment_stamp = segment_stamp;
   pc.topic = cluster_topic_list->currentText().toStdString();
   pc.type = "sensor_msgs/PointCloud2";
   pc.points = selected_points;
+  pc.cluster_pos = cluster_pos;
+  pc.point_pos = point_pos;
 
   custom_cluster.push_back(pc);
 
@@ -456,6 +467,9 @@ void AnnotationPanel::divideAction()
   				if(it->x == pit->x and it->y == pit->y and it->z == pit->z){
   					found = true;
   					custom_cluster[i].points.erase(pit);
+            size_t dist = std::distance(custom_cluster[i].points.begin(), pit);
+            custom_cluster[i].cluster_pos.erase(custom_cluster[i].cluster_pos.begin() + dist);
+            custom_cluster[i].point_pos.erase(custom_cluster[i].point_pos.begin() + dist);
             break;
   				}
       }
@@ -475,9 +489,12 @@ void AnnotationPanel::divideAction()
   		PointClass pc;
   		pc.name = cluster_name_edit->currentText().toStdString();
   		pc.stamp = msg_stamp;
+      pc.segment_stamp = segment_stamp;
   		pc.topic = cluster_topic_list->currentText().toStdString();
   		pc.type = "sensor_msgs/PointCloud2";
   		pc.points = selected_points;
+      pc.cluster_pos = cluster_pos;
+      pc.point_pos = point_pos;
 
   		custom_cluster.push_back(pc);
 
@@ -523,9 +540,11 @@ void AnnotationPanel::save( rviz::Config config ) const
   {
     csvfile << it->name << ",";
     csvfile << std::fixed << std::setprecision(10) << it->stamp.toSec() << ",";
+    csvfile << it->segment_stamp << ",";
     csvfile << it->topic << "," << it->type;
     csvfile << ",[";
  
+    //points
     bool first_time = true;
     for(auto pit=it->points.begin(); pit != it->points.end(); pit++)
     {
@@ -535,6 +554,34 @@ void AnnotationPanel::save( rviz::Config config ) const
         csvfile << ",";
     
       csvfile << "(" << pit->x << "," << pit->y << "," << pit->z << ")";
+    }
+
+    csvfile << "]," << std::endl;
+
+    //cluster pos
+    first_time = true;
+    for(auto pit=it->cluster_pos.begin(); pit != it->cluster_pos.end(); pit++)
+    {
+      if(first_time)
+        first_time = false;
+      else
+        csvfile << ",";
+    
+      csvfile << *pit;
+    }
+
+    csvfile << "]," << std::endl;
+
+    //point pos
+    first_time = true;
+    for(auto pit=it->point_pos.begin(); pit != it->point_pos.end(); pit++)
+    {
+      if(first_time)
+        first_time = false;
+      else
+        csvfile << ",";
+    
+      csvfile << *pit;
     }
 
     csvfile << "]" << std::endl;

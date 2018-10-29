@@ -309,11 +309,13 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 							pt.y = cloud.points[k].y;
 							pt.z = cloud.points[k].z;
 							found_points.points.push_back(pt);
+							found_points.point_pos.push_back(k);
 							break;
 						}
 
 					if(found_point){
 						found_clusters.push_back(cluster_msg.cluster_id[j]);
+						found_points.cluster_pos.push_back(j);
 						found_point_cntr++;
 						break;
 					}
@@ -354,6 +356,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 			}
 
 			found_points.state_msg.data = state_msg;
+			found_points.segment_stamp = cluster_msg.header.stamp;
 
 			selection_pub.publish(found_points);
 			ros::spinOnce();

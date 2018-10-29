@@ -13,9 +13,12 @@ typedef struct pointClass
 {
   std::string name;
   ros::Time stamp;
+  ros::Time segment_stamp;
   std::string topic;
   std::string type;
   std::vector<geometry_msgs::Point> points;
+  std::vector<long> cluster_pos;
+  std::vector<long> point_pos;
 }PointClass;
 
 std::vector<PointClass> readcsv();
