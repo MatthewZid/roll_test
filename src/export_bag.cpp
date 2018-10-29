@@ -2,6 +2,7 @@
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <pointcloud_msgs/PointCloud2_Segments.h>
 #include <roll_test/point_class.h>
 #include <fstream>
 
@@ -55,8 +56,14 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	rosbag::View full_bag_view;
+	full_bag_view.addQuery(input_bag);
+
+	ros::Time initial_time = full_bag_view.getBeginTime();
+	ros::Time finish_time = ros::TIME_MAX;
+
 	rosbag::View bag_view;
-	bag_view.addQuery(input_bag);
+	bag_view.addQuery(input_bag, initial_time, finish_time);
 
 	//sort clusters according to stamp
 	//std::sort(cluster.begin(), cluster.end(), sortWay);
@@ -66,21 +73,18 @@ int main(int argc, char **argv)
 
 	for(rosbag::MessageInstance m : bag_view)
 	{
-		if(!m.isType<sensor_msgs::PointCloud2>())
+		if(!m.isType<sensor_msgs::PointCloud2>() or m.getTopic() != "/pointcloud2_segments_viz/pc2_viz")
 			continue;
 
 		std::vector<size_t> posvec;
 
-		for(int i=0; i < cluster.size(); i++)
+		for(size_t i=0; i < cluster.size(); i++)
 			if(m.getTime().toSec() == cluster[i].stamp.toSec())
 				posvec.push_back(i);
 
 		if(!posvec.empty())
 			stamp_map.insert(std::make_pair(m.getTime().toSec(), posvec));
 	}
-
-	if(stamp_map.empty())
-		ROS_WARN("HSHGJHG");
 
 	//class count
 	std::set<std::string> clusters_set;
@@ -118,6 +122,7 @@ int main(int argc, char **argv)
 
 		color_map.insert(std::make_pair(class_name, color_val));
 	}
+
 	//write messages to output bagfile, consulting csv annotations
 	for(rosbag::MessageInstance m : bag_view)
 	{
