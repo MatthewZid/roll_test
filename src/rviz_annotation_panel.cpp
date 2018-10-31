@@ -467,46 +467,46 @@ void AnnotationPanel::divideAction()
   				if(it->x == pit->x and it->y == pit->y and it->z == pit->z){
   					found = true;
   					custom_cluster[i].points.erase(pit);
-            size_t dist = std::distance(custom_cluster[i].points.begin(), pit);
-            custom_cluster[i].cluster_pos.erase(custom_cluster[i].cluster_pos.begin() + dist);
-            custom_cluster[i].point_pos.erase(custom_cluster[i].point_pos.begin() + dist);
-            break;
+  					size_t dist = std::distance(custom_cluster[i].points.begin(), pit);
+  					custom_cluster[i].cluster_pos.erase(custom_cluster[i].cluster_pos.begin() + dist);
+  					custom_cluster[i].point_pos.erase(custom_cluster[i].point_pos.begin() + dist);
+  					break;
   				}
-      }
+  		}
 
     	if(!found){
     		ROS_WARN("There is nothing to separate!\n Press Join to create new class\n");
 
     		cluster_join_btn->setEnabled(true);
     		cluster_name_edit->setVisible(false);
-	      cluster_name_btn->setVisible(false);
-	      cancel_btn->setVisible(false);
+    		cluster_name_btn->setVisible(false);
+    		cancel_btn->setVisible(false);
 
-	      return;
+    		return;
     	}
 
   		//create new class
   		PointClass pc;
   		pc.name = cluster_name_edit->currentText().toStdString();
   		pc.stamp = msg_stamp;
-      pc.segment_stamp = segment_stamp;
+  		pc.segment_stamp = segment_stamp;
   		pc.topic = cluster_topic_list->currentText().toStdString();
   		pc.type = "sensor_msgs/PointCloud2";
   		pc.points = selected_points;
-      pc.cluster_pos = cluster_pos;
-      pc.point_pos = point_pos;
+  		pc.cluster_pos = cluster_pos;
+  		pc.point_pos = point_pos;
 
   		custom_cluster.push_back(pc);
 
-      updateMarkers();
+  		updateMarkers();
 
     	marker_pub.publish(marker_array);
-      ros::spinOnce();
+    	ros::spinOnce();
 
-      cluster_name_edit->setVisible(false);
-      cluster_name_btn->setVisible(false);
-      cancel_btn->setVisible(false);
-      id_state_show->setText("");  
+    	cluster_name_edit->setVisible(false);
+    	cluster_name_btn->setVisible(false);
+    	cancel_btn->setVisible(false);
+    	id_state_show->setText("");  
   		break;
   	}
 }
@@ -540,7 +540,7 @@ void AnnotationPanel::save( rviz::Config config ) const
   {
     csvfile << it->name << ",";
     csvfile << std::fixed << std::setprecision(10) << it->stamp.toSec() << ",";
-    csvfile << it->segment_stamp << ",";
+    csvfile << it->segment_stamp.toSec() << ",";
     csvfile << it->topic << "," << it->type;
     csvfile << ",[";
  
@@ -553,35 +553,13 @@ void AnnotationPanel::save( rviz::Config config ) const
       else
         csvfile << ",";
     
-      csvfile << "(" << pit->x << "," << pit->y << "," << pit->z << ")";
-    }
+      csvfile << "((" << pit->x << "," << pit->y << "," << pit->z << "),";
 
-    csvfile << "]," << std::endl;
+      size_t dist = std::distance(it->points.begin(), pit);
+      auto clusterit = it->cluster_pos.begin() + dist;
+      auto pointit = it->point_pos.begin() + dist;
 
-    //cluster pos
-    first_time = true;
-    for(auto pit=it->cluster_pos.begin(); pit != it->cluster_pos.end(); pit++)
-    {
-      if(first_time)
-        first_time = false;
-      else
-        csvfile << ",";
-    
-      csvfile << *pit;
-    }
-
-    csvfile << "]," << std::endl;
-
-    //point pos
-    first_time = true;
-    for(auto pit=it->point_pos.begin(); pit != it->point_pos.end(); pit++)
-    {
-      if(first_time)
-        first_time = false;
-      else
-        csvfile << ",";
-    
-      csvfile << *pit;
+      csvfile << *clusterit << "," << *pointit << ")";
     }
 
     csvfile << "]" << std::endl;
