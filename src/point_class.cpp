@@ -38,18 +38,34 @@ std::vector<PointClass> readcsv()
 		pc.stamp.fromSec(tm);
 
 		std::getline(lss, line, ',');
+		std::istringstream(line) >> tm;
+		pc.segment_stamp.fromSec(tm);
+
+		std::getline(lss, line, ',');
 		pc.topic = line;
 
 		std::getline(lss, line, ',');
 		pc.type = line;
 
+		std::getline(lss, line, '[');
 		std::getline(lss, line);
-		std::smatch m;
-		std::regex reg("([\\w,\\w,\\w]([^\\(|\\)|\\])]*))([^,|\\(|\\)])");	//pattern: find x,y,z in list [(x,y,z),...]
-		std::vector<geometry_msgs::Point> pvec;
 
-		while(std::regex_search(line, m, reg)){
-			std::istringstream pss(m[0]);
+		//find x,y,z,v,w in list [((x,y,z),v,w),...]
+		std::smatch m;
+		std::regex reg("^\\(\\(([-\\.[:digit:]]+,[-\\.[:digit:]]+,[-\\.[:digit:]]+)\\)(,[-\\.[:digit:]]+,[-\\.[:digit:]]+)\\),?(.*)$");
+		std::string rem = line;
+		std::vector<geometry_msgs::Point> pvec;
+		std::vector<long> clpos;
+		std::vector<long> ppos;
+
+		while(rem != "]"){
+			std::string temp;
+			std::string result;
+			std::regex_replace (std::back_inserter(result), rem.begin(), rem.end(), reg, "$1$2");
+			std::regex_replace (std::back_inserter(temp), rem.begin(), rem.end(), reg, "$3");
+
+			//point
+			std::istringstream pss(result);
 			std::string num;
 			geometry_msgs::Point point;
 
@@ -68,10 +84,23 @@ std::vector<PointClass> readcsv()
 
 			pvec.push_back(point);
 
-			line = m.suffix().str();
+			//cluster pos
+			long pos;
+			std::getline(pss, num, ',');
+			std::istringstream(num) >> pos;
+			clpos.push_back(pos);
+
+			//point pos
+			std::getline(pss, num, ',');
+			std::istringstream(num) >> pos;
+			ppos.push_back(pos);
+
+			rem = temp;
 		}
 
 		pc.points = pvec;
+		pc.cluster_pos = clpos;
+		pc.point_pos = ppos;
 
 		cc.push_back(pc);
 	}

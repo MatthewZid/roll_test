@@ -73,18 +73,23 @@ int main(int argc, char **argv)
 
 	for(rosbag::MessageInstance m : bag_view)
 	{
-		if(!m.isType<sensor_msgs::PointCloud2>() or m.getTopic() != "/pointcloud2_segments_viz/pc2_viz")
+		/*if(!m.isType<sensor_msgs::PointCloud2>() or m.getTopic() != "/pointcloud2_segments_viz/pc2_viz")
+			continue;*/
+		if(!m.isType<pointcloud_msgs::PointCloud2_Segments>() or m.getTopic() != "/pointcloud2_cluster_tracking/clusters")
 			continue;
 
 		std::vector<size_t> posvec;
 
 		for(size_t i=0; i < cluster.size(); i++)
-			if(m.getTime().toSec() == cluster[i].stamp.toSec())
+			if(m.getTime().toSec() == cluster[i].segment_stamp.toSec())
 				posvec.push_back(i);
 
 		if(!posvec.empty())
 			stamp_map.insert(std::make_pair(m.getTime().toSec(), posvec));
 	}
+
+	if(stamp_map.empty())
+		ROS_WARN("KJKLJLJLLK\n");
 
 	//class count
 	std::set<std::string> clusters_set;
@@ -122,19 +127,19 @@ int main(int argc, char **argv)
 
 		color_map.insert(std::make_pair(class_name, color_val));
 	}
-
+ROS_WARN("END\n");
 	//write messages to output bagfile, consulting csv annotations
-	for(rosbag::MessageInstance m : bag_view)
+	/*for(rosbag::MessageInstance m : bag_view)
 	{
-		if(!m.isType<sensor_msgs::PointCloud2>()){
-			//output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
+		if(!m.isType<pointcloud_msgs::PointCloud2_Segments>() or m.getTopic() != "/pointcloud2_cluster_tracking/clusters"){
+			output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
 			continue;
 		}
 
 		auto it = stamp_map.find(m.getTime().toSec());
 
         if(it == stamp_map.end()){
-        	//output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
+        	output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
         	continue;
         }
 
@@ -188,7 +193,7 @@ int main(int argc, char **argv)
         pcl_conversions::fromPCL(cloud_annot, *final_pcmsg);
 
         output_bag.write(m.getTopic(), m.getTime(), final_pcmsg, m.getConnectionHeader());
-	}
+	}*/
 
 	input_bag.close();
 	output_bag.close();
