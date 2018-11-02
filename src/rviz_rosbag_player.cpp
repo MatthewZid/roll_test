@@ -785,9 +785,9 @@ int Player::doPublish(rosbag::MessageInstance const& m)
 
 /////////////////// Copy this to signal handler!!! /////////////////////
 
-/*if(m.isType<sensor_msgs::LaserScan>()){
-    boost::shared_ptr<sensor_msgs::LaserScan> kourada = m.instantiate<sensor_msgs::LaserScan>();
-    ROS_INFO("%lf\n", kourada->ranges[0]);
+/*if(m.isType<sensor_msgs::PointCloud2>()){
+    boost::shared_ptr<sensor_msgs::PointCloud2> kourada = m.instantiate<sensor_msgs::PointCloud2>();
+    std::cout << "Player: " << std::fixed << std::setprecision(10) << kourada->header.stamp.toSec() << std::endl;
 }*/
 
 /////////////////// Copy this to signal handler!!! /////////////////////
