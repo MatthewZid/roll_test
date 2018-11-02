@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
+#include <rosbag/message_instance.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 #include <roll_test/point_class.h>
@@ -8,9 +9,15 @@
 
 #include <pcl_ros/point_cloud.h>
 
+namespace rosbag
+{
+class MessageInstance;
+class View;
+}
+
 bool sortWay(roll_test::PointClass a, roll_test::PointClass b)
 {
-	return(a.stamp.toSec() < b.stamp.toSec());
+	return(a.segment_stamp.toSec() < b.segment_stamp.toSec());
 }
 
 int main(int argc, char **argv)
@@ -60,13 +67,13 @@ int main(int argc, char **argv)
 	full_bag_view.addQuery(input_bag);
 
 	ros::Time initial_time = full_bag_view.getBeginTime();
-	ros::Time finish_time = ros::TIME_MAX;
+	ros::Time finish_time = full_bag_view.getEndTime();
 
 	rosbag::View bag_view;
 	bag_view.addQuery(input_bag, initial_time, finish_time);
 
 	//sort clusters according to stamp
-	//std::sort(cluster.begin(), cluster.end(), sortWay);
+	std::sort(cluster.begin(), cluster.end(), sortWay);
 
 	//create timestamp map
 	std::map< double, std::vector<size_t> > stamp_map;
@@ -78,18 +85,17 @@ int main(int argc, char **argv)
 		if(!m.isType<pointcloud_msgs::PointCloud2_Segments>() or m.getTopic() != "/pointcloud2_cluster_tracking/clusters")
 			continue;
 
+		boost::shared_ptr<pointcloud_msgs::PointCloud2_Segments> pcs_msg = m.instantiate<pointcloud_msgs::PointCloud2_Segments>();
+
 		std::vector<size_t> posvec;
 
 		for(size_t i=0; i < cluster.size(); i++)
-			if(m.getTime().toSec() == cluster[i].segment_stamp.toSec())
+			if(pcs_msg->header.stamp.toSec() == cluster[i].segment_stamp.toSec())
 				posvec.push_back(i);
 
 		if(!posvec.empty())
-			stamp_map.insert(std::make_pair(m.getTime().toSec(), posvec));
+			stamp_map.insert(std::make_pair(pcs_msg->header.stamp.toSec(), posvec));
 	}
-
-	if(stamp_map.empty())
-		ROS_WARN("KJKLJLJLLK\n");
 
 	//class count
 	std::set<std::string> clusters_set;
@@ -127,26 +133,74 @@ int main(int argc, char **argv)
 
 		color_map.insert(std::make_pair(class_name, color_val));
 	}
-ROS_WARN("END\n");
+
+	std::vector<sensor_msgs::PointCloud2> pc_msg_vec;
+
 	//write messages to output bagfile, consulting csv annotations
-	/*for(rosbag::MessageInstance m : bag_view)
+	for(rosbag::MessageInstance m : bag_view)
 	{
 		if(!m.isType<pointcloud_msgs::PointCloud2_Segments>() or m.getTopic() != "/pointcloud2_cluster_tracking/clusters"){
 			output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
 			continue;
 		}
 
-		auto it = stamp_map.find(m.getTime().toSec());
+		boost::shared_ptr<pointcloud_msgs::PointCloud2_Segments> pcs_msg = m.instantiate<pointcloud_msgs::PointCloud2_Segments>();
+
+		auto it = stamp_map.find(pcs_msg->header.stamp.toSec());
 
         if(it == stamp_map.end()){
         	output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
         	continue;
         }
 
-		//if pointcloud2, consult csv and then write
-		boost::shared_ptr<sensor_msgs::PointCloud2> pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
-		pcl::PCLPointCloud2 cloud2;
-        pcl_conversions::toPCL(*pc_msg, cloud2);
+		//if pointcloud2_segments, consult csv and then write
+        for(int i=0; i < pcs_msg->clusters.size(); i++)
+        {
+        	pcl::PCLPointCloud2 cloud2;
+	        pcl_conversions::toPCL(pcs_msg->clusters[i], cloud2);
+
+	        pcl::PointCloud<pcl::PointXYZRGB> cloud;
+	        pcl::fromPCLPointCloud2(cloud2, cloud);
+
+	        for(int j=0; j < cloud.points.size(); j++)
+	        {
+	        	cloud.points[j].r = 80;
+				cloud.points[j].g = 80;
+				cloud.points[j].b = 80;
+	        }
+        }
+
+        for(int i=0; i < it->second.size(); i++)
+        {
+        	size_t pos = (it->second)[i];
+
+        	for(int j=0; j < cluster[pos].points.size(); j++)
+        	{
+        		auto colit = color_map.find(cluster[pos].name);
+        		size_t clpos = cluster[pos].cluster_pos[j];
+        		size_t ppos = cluster[pos].point_pos[j];
+
+        		pcl::PCLPointCloud2 cloud2;
+		        pcl_conversions::toPCL(pcs_msg->clusters[clpos], cloud2);
+
+		        pcl::PointCloud<pcl::PointXYZRGB> cloud;
+		        pcl::fromPCLPointCloud2(cloud2, cloud);
+
+		        if(cloud.points[ppos].x == cluster[pos].points[j].x and
+		        	cloud.points[ppos].y == cluster[pos].points[j].y and
+		        	cloud.points[ppos].z == cluster[pos].points[j].z)
+		        {
+		        	ROS_WARN("YEAHHHH\n");
+		        }
+
+        		cloud.points[ppos].r = colit->second.r;
+				cloud.points[ppos].g = colit->second.g;
+				cloud.points[ppos].b = colit->second.b;
+        	}
+        }
+
+		/*pcl::PCLPointCloud2 cloud2;
+        pcl_conversions::toPCL(*pcs_msg, cloud2);
 
         pcl::PointCloud<pcl::PointXYZRGB> cloud;
         pcl::fromPCLPointCloud2(cloud2, cloud);
@@ -192,8 +246,8 @@ ROS_WARN("END\n");
         pcl::toPCLPointCloud2(cloud, cloud_annot);
         pcl_conversions::fromPCL(cloud_annot, *final_pcmsg);
 
-        output_bag.write(m.getTopic(), m.getTime(), final_pcmsg, m.getConnectionHeader());
-	}*/
+        output_bag.write(m.getTopic(), pcs_msg->header.stamp, final_pcmsg, m.getConnectionHeader());*/
+	}
 
 	input_bag.close();
 	output_bag.close();
