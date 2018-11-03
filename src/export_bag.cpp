@@ -24,6 +24,8 @@ int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "exportBag");
 
+	ros::NodeHandle nh;
+
 	//initialize files
 	rosbag::Bag input_bag;
 	rosbag::Bag output_bag;
@@ -80,8 +82,6 @@ int main(int argc, char **argv)
 
 	for(rosbag::MessageInstance m : bag_view)
 	{
-		/*if(!m.isType<sensor_msgs::PointCloud2>() or m.getTopic() != "/pointcloud2_segments_viz/pc2_viz")
-			continue;*/
 		if(!m.isType<pointcloud_msgs::PointCloud2_Segments>() or m.getTopic() != "/pointcloud2_cluster_tracking/clusters")
 			continue;
 
@@ -100,10 +100,10 @@ int main(int argc, char **argv)
 	//class count
 	std::set<std::string> clusters_set;
 
-	for(int i=0; i < cluster.size(); i++)
+	for(size_t i=0; i < cluster.size(); i++)
 		clusters_set.insert(cluster[i].name);
 
-	int class_num = clusters_set.size();
+	size_t class_num = clusters_set.size();
 
 	//class-color map
 	std::map<std::string, pcl::PointXYZRGB> color_map;
@@ -134,13 +134,49 @@ int main(int argc, char **argv)
 		color_map.insert(std::make_pair(class_name, color_val));
 	}
 
-	std::vector<sensor_msgs::PointCloud2> pc_msg_vec;
+	std::vector< pcl::PointCloud<pcl::PointXYZRGB> > pc_msg_vec;
+	bool found = false;
+
+	std::cout << "Please wait..." << std::endl <<std::endl;
 
 	//write messages to output bagfile, consulting csv annotations
 	for(rosbag::MessageInstance m : bag_view)
 	{
 		if(!m.isType<pointcloud_msgs::PointCloud2_Segments>() or m.getTopic() != "/pointcloud2_cluster_tracking/clusters"){
-			output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
+			if(m.isType<sensor_msgs::PointCloud2>() and m.getTopic() == "/pointcloud2_segments_viz/pc2_viz")
+			{
+				if(!found)
+				{
+					output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
+					continue;
+				}
+
+				boost::shared_ptr<sensor_msgs::PointCloud2> pc2_msg = m.instantiate<sensor_msgs::PointCloud2>();
+				boost::shared_ptr<sensor_msgs::PointCloud2> accumulator(boost::make_shared<sensor_msgs::PointCloud2>());
+
+    			for(size_t i=0; i < pc_msg_vec.size(); i++)
+    			{
+    				pcl::PCLPointCloud2 clouds;
+    				sensor_msgs::PointCloud2 cluster_msgs;
+
+			        pcl::toPCLPointCloud2(pc_msg_vec[i], clouds);
+			        pcl_conversions::fromPCL(clouds, cluster_msgs);
+
+			        cluster_msgs.header.stamp = ros::Time::now();
+			        cluster_msgs.header.frame_id = pc2_msg->header.frame_id;
+
+			        sensor_msgs::PointCloud2 tmp = sensor_msgs::PointCloud2(*accumulator);
+			        pcl::concatenatePointCloud(cluster_msgs, tmp, *accumulator);
+    			}
+
+    			accumulator->header.stamp = ros::Time::now();
+    			accumulator->header.frame_id = pc2_msg->header.frame_id;
+
+    			output_bag.write(m.getTopic(), m.getTime(), accumulator, m.getConnectionHeader());
+			}
+			else
+				output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
+
 			continue;
 		}
 
@@ -149,104 +185,73 @@ int main(int argc, char **argv)
 		auto it = stamp_map.find(pcs_msg->header.stamp.toSec());
 
         if(it == stamp_map.end()){
+        	found = false;
         	output_bag.write(m.getTopic(), m.getTime(), m, m.getConnectionHeader());
         	continue;
         }
 
+        std::vector< pcl::PointCloud<pcl::PointXYZRGB> > cloud_vec;
+
 		//if pointcloud2_segments, consult csv and then write
-        for(int i=0; i < pcs_msg->clusters.size(); i++)
+        for(size_t i=0; i < pcs_msg->clusters.size(); i++)
         {
         	pcl::PCLPointCloud2 cloud2;
 	        pcl_conversions::toPCL(pcs_msg->clusters[i], cloud2);
 
+	        pcl::PointCloud<pcl::PointXYZ> cloudtemp;
 	        pcl::PointCloud<pcl::PointXYZRGB> cloud;
-	        pcl::fromPCLPointCloud2(cloud2, cloud);
+	        pcl::fromPCLPointCloud2(cloud2, cloudtemp);
+	        pcl::copyPointCloud(cloudtemp, cloud);
 
-	        for(int j=0; j < cloud.points.size(); j++)
+	        for(size_t j=0; j < cloud.points.size(); j++)
 	        {
 	        	cloud.points[j].r = 80;
 				cloud.points[j].g = 80;
 				cloud.points[j].b = 80;
 	        }
+
+	        cloud_vec.push_back(cloud);
         }
 
-        for(int i=0; i < it->second.size(); i++)
+        for(size_t i=0; i < it->second.size(); i++)
         {
         	size_t pos = (it->second)[i];
 
-        	for(int j=0; j < cluster[pos].points.size(); j++)
+        	for(size_t j=0; j < cluster[pos].points.size(); j++)
         	{
         		auto colit = color_map.find(cluster[pos].name);
         		size_t clpos = cluster[pos].cluster_pos[j];
         		size_t ppos = cluster[pos].point_pos[j];
 
-        		pcl::PCLPointCloud2 cloud2;
-		        pcl_conversions::toPCL(pcs_msg->clusters[clpos], cloud2);
-
-		        pcl::PointCloud<pcl::PointXYZRGB> cloud;
-		        pcl::fromPCLPointCloud2(cloud2, cloud);
-
-		        if(cloud.points[ppos].x == cluster[pos].points[j].x and
-		        	cloud.points[ppos].y == cluster[pos].points[j].y and
-		        	cloud.points[ppos].z == cluster[pos].points[j].z)
-		        {
-		        	ROS_WARN("YEAHHHH\n");
-		        }
-
-        		cloud.points[ppos].r = colit->second.r;
-				cloud.points[ppos].g = colit->second.g;
-				cloud.points[ppos].b = colit->second.b;
+        		cloud_vec[clpos].points[ppos].r = colit->second.r;
+				cloud_vec[clpos].points[ppos].g = colit->second.g;
+				cloud_vec[clpos].points[ppos].b = colit->second.b;
         	}
         }
 
-		/*pcl::PCLPointCloud2 cloud2;
-        pcl_conversions::toPCL(*pcs_msg, cloud2);
+        pc_msg_vec = cloud_vec;
+        found = true;
 
-        pcl::PointCloud<pcl::PointXYZRGB> cloud;
-        pcl::fromPCLPointCloud2(cloud2, cloud);
+        std::vector<sensor_msgs::PointCloud2> cloud2_vec;
 
-        for(int i=0; i < cloud.points.size(); i++)
+        for(size_t i=0; i < cloud_vec.size(); i++)
         {
-        	bool found = false;
+        	pcl::PCLPointCloud2 clouds;
+			sensor_msgs::PointCloud2 cluster_msgs;
 
-        	for(int j=0; j < it->second.size(); j++)
-        	{
-        		size_t pos = (it->second)[j];
+	        pcl::toPCLPointCloud2(cloud_vec[i], clouds);
+	        pcl_conversions::fromPCL(clouds, cluster_msgs);
 
-        		for(int k=0; k < cluster[pos].points.size(); k++)
-        			if(cloud.points[i].x == cluster[pos].points[k].x and
-        				cloud.points[i].y == cluster[pos].points[k].y and
-        				cloud.points[i].z == cluster[pos].points[k].z)
-        			{
-        				found = true;
-        				auto colit = color_map.find(cluster[pos].name);
+	        std::string frame_id = pcs_msg->clusters[i].header.frame_id;
+	        cluster_msgs.header.stamp = ros::Time::now();
+	        cluster_msgs.header.frame_id = frame_id;
 
-        				cloud.points[i].r = colit->second.r;
-        				cloud.points[i].g = colit->second.g;
-        				cloud.points[i].b = colit->second.b;
-
-        				break;
-        			}
-
-        		if(found)
-        			break;
-        	}
-
-        	if(!found)
-        	{
-        		cloud.points[i].r = 80;
-				cloud.points[i].g = 80;
-				cloud.points[i].b = 80;
-        	}
+	        pcs_msg->clusters[i] = cluster_msgs;
         }
 
-        boost::shared_ptr<sensor_msgs::PointCloud2> final_pcmsg(boost::make_shared<sensor_msgs::PointCloud2>());
+        pcs_msg->header.stamp = ros::Time::now();
 
-        pcl::PCLPointCloud2 cloud_annot;
-        pcl::toPCLPointCloud2(cloud, cloud_annot);
-        pcl_conversions::fromPCL(cloud_annot, *final_pcmsg);
-
-        output_bag.write(m.getTopic(), pcs_msg->header.stamp, final_pcmsg, m.getConnectionHeader());*/
+        output_bag.write(m.getTopic(), m.getTime(), pcs_msg, m.getConnectionHeader());
 	}
 
 	input_bag.close();
