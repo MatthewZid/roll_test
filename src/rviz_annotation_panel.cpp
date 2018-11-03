@@ -1,7 +1,7 @@
 #include <roll_test/rviz_annotation_panel.h>
 
 QLineEdit* id_state_show;
-std::vector<geometry_msgs::Point> selected_points;
+std::vector<geometry_msgs::Point32> selected_points;
 std::vector<long> cluster_pos;
 std::vector<long> point_pos;
 
@@ -40,7 +40,7 @@ void vizCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
   marker_pub.publish(marker_array);
 }
 
-void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std::string& cl_name)
+void insertMarker(const std::vector<geometry_msgs::Point32>& points_vec, const std::string& cl_name)
 {
   //aabb around selected points (with marker)
   pcl::PointCloud<pcl::PointXYZ> cloud;

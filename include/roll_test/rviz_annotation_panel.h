@@ -3,7 +3,7 @@
 
 #ifndef Q_MOC_RUN
 # include <ros/ros.h>
-#include <geometry_msgs/Point.h>
+#include <geometry_msgs/Point32.h>
 #include <roll_test/PointSelection.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
@@ -30,7 +30,7 @@
 
 class QLineEdit;
 
-void insertMarker(const std::vector<geometry_msgs::Point>& points_vec, const std::string& cl_name);
+void insertMarker(const std::vector<geometry_msgs::Point32>& points_vec, const std::string& cl_name);
 void publishDeleteMarker();
 void updateMarkers();
 

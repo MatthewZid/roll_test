@@ -1,7 +1,7 @@
 #include <roll_test/stop_tool.h>
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
-#include <geometry_msgs/Point.h>
+#include <geometry_msgs/Point32.h>
 #include <roll_test/PointSelection.h>
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 
@@ -301,7 +301,7 @@ int StopTool::processMouseEvent( rviz::ViewportMouseEvent& event )
 					for(size_t k=0; k < cloud.points.size(); k++)
 						if(pc_vec.x == cloud.points[k].x and pc_vec.y == cloud.points[k].y and pc_vec.z == cloud.points[k].z)
 						{
-							geometry_msgs::Point pt;
+							geometry_msgs::Point32 pt;
 
 							found_point = true;
 

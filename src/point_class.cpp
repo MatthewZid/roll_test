@@ -54,7 +54,7 @@ std::vector<PointClass> readcsv()
 		std::smatch m;
 		std::regex reg("^\\(\\(([-\\.[:digit:]]+,[-\\.[:digit:]]+,[-\\.[:digit:]]+)\\)(,[-\\.[:digit:]]+,[-\\.[:digit:]]+)\\),?(.*)$");
 		std::string rem = line;
-		std::vector<geometry_msgs::Point> pvec;
+		std::vector<geometry_msgs::Point32> pvec;
 		std::vector<long> clpos;
 		std::vector<long> ppos;
 
@@ -67,7 +67,7 @@ std::vector<PointClass> readcsv()
 			//point
 			std::istringstream pss(result);
 			std::string num;
-			geometry_msgs::Point point;
+			geometry_msgs::Point32 point;
 
 			double pt;
 			std::getline(pss, num, ',');
