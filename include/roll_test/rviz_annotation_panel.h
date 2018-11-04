@@ -24,6 +24,7 @@
 #include <QPushButton>
 #include <QGroupBox>
 #include <QComboBox>
+#include <roll_test/edit_widget.h>
 
 #include <roll_test/point_class.h>
 #endif
@@ -89,8 +90,8 @@ private:
 protected:
   QPushButton *cluster_name_btn;
   QPushButton *cluster_join_btn;
-  QComboBox* cluster_name_edit;
-  QComboBox* cluster_topic_list;
+  EditWidget* cluster_name_edit;
+  EditWidget* cluster_topic_list;
   QPushButton *refresh_btn;
   QPushButton *divide_btn;
   QPushButton *cancel_btn;

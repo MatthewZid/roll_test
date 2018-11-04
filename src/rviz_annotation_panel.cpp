@@ -247,7 +247,7 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
   divide_btn->setEnabled(false);
 
   QHBoxLayout* cluster_name_layout = new QHBoxLayout;
-  cluster_name_edit = new QComboBox;
+  cluster_name_edit = new EditWidget;
   cluster_name_edit->setEditable(true);
   cluster_name_edit->setVisible(false);
   cluster_name_layout->addWidget(cluster_name_edit);
@@ -257,7 +257,7 @@ AnnotationPanel::AnnotationPanel( QWidget* parent )
 
   QHBoxLayout* topic_list_layout = new QHBoxLayout;
   topic_list_layout->addWidget(new QLabel("Topic list:"));
-  cluster_topic_list = new QComboBox;
+  cluster_topic_list = new EditWidget;
   cluster_topic_list->setEditable(true);
   topic_list_layout->addWidget(cluster_topic_list);
   refresh_btn = new QPushButton("Refresh");
@@ -310,12 +310,12 @@ void AnnotationPanel::topicSelect(const QString& txt)
 	if(txt.toStdString() == current_topic)
 		return;
 
-	viz_sub.shutdown();
+  if(txt.toStdString() == "")
+    return;
 
-	if(cluster_topic_list->count() > 0){
-		viz_sub = nh.subscribe(txt.toStdString(), 1, vizCallback);
-		ROS_INFO("Subscribed to topic: %s\n", txt.toStdString().c_str());
-	}
+	viz_sub.shutdown();
+	viz_sub = nh.subscribe(txt.toStdString(), 1, vizCallback);
+	ROS_INFO("Subscribed to topic: %s\n", txt.toStdString().c_str());
 }
 
 void AnnotationPanel::handleTxtChanged()
@@ -408,9 +408,6 @@ void AnnotationPanel::cancelButton()
 
 void AnnotationPanel::refreshAction()
 {
-	for(int i=0; i < cluster_topic_list->count(); i++)
-		cluster_topic_list->removeItem(i);
-
 	createTopicList();
 
 	ROS_INFO("Topic list refreshed\n");
@@ -418,7 +415,6 @@ void AnnotationPanel::refreshAction()
 
 void AnnotationPanel::createTopicList()
 {
-	int topic_index = 0;
 	ros::master::V_TopicInfo master_topics;
 	ros::master::getTopics(master_topics);
 
@@ -426,23 +422,19 @@ void AnnotationPanel::createTopicList()
 	{
 		const ros::master::TopicInfo& info = *it;
 
-		if(info.datatype.find("sensor_msgs/PointCloud2") != std::string::npos)
-			cluster_topic_list->insertItem(topic_index++, QString(info.name.c_str()));
+		if(info.datatype == "sensor_msgs/PointCloud2")
+    {
+      int item_index = cluster_topic_list->findText(QString(info.name.c_str()));
+
+      if(item_index == -1)
+        cluster_topic_list->addItem(QString(info.name.c_str()));
+    }
 	}
 
-	std::string current_topic = viz_sub.getTopic();
-	std::string current_list = cluster_topic_list->currentText().toStdString();
+  std::string current_topic = viz_sub.getTopic();
 
-	if(current_list == current_topic)
-		return;
-
-	viz_sub.shutdown();
-
-	if(cluster_topic_list->count() > 0){
-		cluster_topic_list->setCurrentIndex(0);
-		viz_sub = nh.subscribe(cluster_topic_list->currentText().toStdString(), 1, vizCallback);
-		ROS_INFO("Subscribed to topic: %s\n", cluster_topic_list->currentText().toStdString().c_str());
-	}
+  if(current_topic == "")
+    cluster_topic_list->setCurrentIndex(0);
 }
 
 void AnnotationPanel::createNameList()
